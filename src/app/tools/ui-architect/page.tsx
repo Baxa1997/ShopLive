@@ -8,6 +8,8 @@ import { ComponentOption } from '@/lib/ui-builder-config';
 import { assemblePrompt } from '@/lib/prompt-engine';
 import { Sparkles, ArrowRight } from 'lucide-react';
 
+import Link from 'next/link';
+
 export default function UIArchitectPage() {
   const [selectedComponent, setSelectedComponent] = useState<ComponentOption | null>(null);
   const [choices, setChoices] = useState<Record<string, string | boolean>>({});
@@ -40,8 +42,17 @@ export default function UIArchitectPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans pb-20">
-      <header className="mb-12 text-center max-w-4xl mx-auto">
+    <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans pb-20 relative">
+      <div className="absolute top-6 left-6 z-10">
+         <Link href="/" className="flex items-center gap-2 group cursor-pointer">
+            <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all">
+                <Sparkles className="w-5 h-5 text-emerald-600" />
+            </div>
+            <span className="font-heading font-bold text-lg text-slate-800 tracking-tight hidden md:block">Life Assistant</span>
+          </Link>
+      </div>
+
+      <header className="mb-12 text-center max-w-4xl mx-auto pt-10">
         <div className="inline-flex items-center justify-center p-3 mb-4 rounded-full bg-emerald-100 text-emerald-700 shadow-sm">
              <Sparkles size={24} />
         </div>

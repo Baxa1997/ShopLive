@@ -43,6 +43,26 @@ export default function LandingHero() {
           <Floating3DObject />
       </div>
 
+      <nav className="absolute top-0 left-0 w-full p-6 z-20">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+                 <div className="bg-white/80 p-2 rounded-lg backdrop-blur-md border border-emerald-500/10 shadow-sm">
+                    <Sparkles className="w-5 h-5 text-emerald-600" />
+                </div>
+                <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">Life Assistant</span>
+            </div>
+
+            {/* Navigation Items */}
+            <Link 
+                href="/pricing"
+                className="px-6 py-2.5 rounded-xl bg-white/80 backdrop-blur-md border border-slate-200 text-slate-700 font-semibold shadow-sm hover:shadow-md hover:text-emerald-600 hover:border-emerald-200 transition-all cursor-pointer"
+            >
+                Pricing
+            </Link>
+        </div>
+      </nav>
+
       {/* Hero Content */}
       <div className="max-w-4xl mx-auto text-center relative z-10 mb-16">
         <motion.div

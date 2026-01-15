@@ -26,7 +26,7 @@ export default function CategoryFilter({
                 key={category}
                 onClick={() => onSelect(category)}
                 className={cn(
-                  'relative px-5 py-2.5 rounded-full text-sm font-medium transition-colors duration-300 whitespace-nowrap z-10',
+                  'relative px-5 py-2.5 rounded-full text-sm font-medium transition-colors duration-300 whitespace-nowrap z-10 cursor-pointer',
                   isActive ? 'text-white' : 'text-slate-500 hover:text-slate-800'
                 )}
               >

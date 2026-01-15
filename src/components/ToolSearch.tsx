@@ -57,14 +57,12 @@ export default function ToolSearch() {
         
 
         <div className="flex items-center justify-between mb-8 text-white/80">
-          <Link href="/" className="flex items-center gap-2 hover:text-white transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back to Home</span>
+          <Link href="/" className="flex items-center gap-2 hover:text-white transition-colors group cursor-pointer">
+            <div className="bg-emerald-500/10 p-2 rounded-lg backdrop-blur-md border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-all">
+                <Sparkles className="w-5 h-5 text-emerald-400" />
+            </div>
+            <span className="font-heading font-bold text-xl text-white tracking-tight">Life Assistant</span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span className="font-heading font-bold text-lg text-white tracking-tight">Life Assistant</span>
-          </div>
         </div>
 
 
@@ -99,7 +97,7 @@ export default function ToolSearch() {
                  key={category}
                  onClick={() => handleCategoryChange(category)}
                  className={cn(
-                   "px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 border",
+                   "px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 border cursor-pointer",
                    activeCategory === category
                      ? "bg-slate-900 text-white border-slate-900 shadow-md"
                      : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700"
