@@ -49,7 +49,6 @@ export default function MagicTextTransform() {
   return (
     <div className="absolute top-1/3 -translate-y-1/2 right-10 md:right-20 w-[320px] pointer-events-none z-0 hidden lg:block">
       <div className="relative">
-        {/* Category Badge */}
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -59,7 +58,7 @@ export default function MagicTextTransform() {
           {current.category}
         </motion.div>
 
-        {/* Transform Container */}
+
         <div className="relative bg-white/40 backdrop-blur-xl rounded-xl p-4 border border-white/60 shadow-xl shadow-slate-900/10">
           
           <AnimatePresence mode="wait">
