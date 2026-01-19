@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
@@ -23,7 +23,7 @@ interface ProductRow {
   image_src: string;
 }
 
-// Helper function to convert file to Google Generative AI format
+
 const fileToGenerativePart = async (file: File): Promise<any> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -49,6 +49,21 @@ export default function ShopifyImporterPage() {
   const [fileName, setFileName] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [error, setError] = useState('');
+  const [usageCount, setUsageCount] = useState(0);
+
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const savedDate = localStorage.getItem('import_usage_date');
+    const savedCount = localStorage.getItem('import_count');
+
+    if (savedDate !== today) {
+      localStorage.setItem('import_usage_date', today);
+      localStorage.setItem('import_count', '0');
+      setUsageCount(0);
+    } else {
+      setUsageCount(Number(savedCount) || 0);
+    }
+  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,6 +83,11 @@ export default function ShopifyImporterPage() {
   };
 
   const handleAnalyze = async () => {
+    if (usageCount >= 10) {
+      alert("Daily Limit Reached (10/10). Please come back tomorrow!");
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     
@@ -135,18 +155,22 @@ Remove '$' symbols from prices.`;
         const response = await result.response;
         const text = response.text();
 
-        console.log('AI Response:', text);
+
         const parsedProducts = JSON.parse(text);
 
         if (!Array.isArray(parsedProducts)) {
             throw new Error("Invalid response format from AI");
         }
 
+        const newCount = usageCount + 1;
+        setUsageCount(newCount);
+        localStorage.setItem('import_count', newCount.toString());
+
         setProducts(parsedProducts);
         setCurrentStep(2);
 
       } else {
-        // Mock data logic
+
         await new Promise(resolve => setTimeout(resolve, 2000));
         const mockProducts: ProductRow[] = [
           {
@@ -167,6 +191,10 @@ Remove '$' symbols from prices.`;
             image_src: ''
           }
         ];
+        const newCount = usageCount + 1;
+        setUsageCount(newCount);
+        localStorage.setItem('import_count', newCount.toString());
+
         setProducts(mockProducts);
         setCurrentStep(2);
       }
@@ -244,7 +272,7 @@ Remove '$' symbols from prices.`;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans pb-20 relative">
-      {/* Home Logo */}
+
       <div className="absolute top-6 left-6 z-10">
         <Link href="/" className="flex items-center gap-2 group cursor-pointer">
           <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all">
@@ -254,7 +282,7 @@ Remove '$' symbols from prices.`;
         </Link>
       </div>
 
-      <header className="mb-12 text-center max-w-4xl mx-auto pt-10">
+      <header className="mb-4 text-center max-w-4xl mx-auto pt-10">
         <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-4 flex items-center justify-center gap-3">
           <span className="text-green-600">Shopify</span> Product Importer
         </h1>
@@ -263,8 +291,8 @@ Remove '$' symbols from prices.`;
         </p>
       </header>
 
-      {/* Stepper */}
-      <div className="max-w-5xl mx-auto mb-12">
+
+      <div className="max-w-5xl mx-auto mb-4">
         <div className="flex items-center justify-between relative">
           {[
             { num: 1, label: 'Input Data' },
@@ -290,12 +318,12 @@ Remove '$' symbols from prices.`;
         </div>
       </div>
 
-      {/* Main Content */}
+
       <main className="max-w-5xl mx-auto">
         
-        {/* STEP 1: Input */}
+
         {currentStep === 1 && (
-          <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200 space-y-8">
+          <div className="bg-white rounded-3xl p-6 md:p-6 shadow-sm border border-slate-200 space-y-8">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-slate-900 mb-3">Upload Supplier Data</h2>
               <p className="text-slate-600">
@@ -303,7 +331,6 @@ Remove '$' symbols from prices.`;
               </p>
             </div>
 
-            {/* Upload File Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-slate-200" />
@@ -312,7 +339,6 @@ Remove '$' symbols from prices.`;
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Upload Button */}
                 <div className="relative">
                   <input
                     type="file"
@@ -336,7 +362,6 @@ Remove '$' symbols from prices.`;
                   </label>
                 </div>
 
-                {/* Or Paste Text */}
                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 hover:bg-slate-50 hover:border-slate-400 transition-all h-48 group">
                   <FileSpreadsheet className="w-10 h-10 text-slate-400 mb-3 group-hover:text-slate-600 transition-colors" />
                   <span className="font-bold text-slate-900 mb-1">Or Paste Below</span>
@@ -345,7 +370,7 @@ Remove '$' symbols from prices.`;
               </div>
             </div>
 
-            {/* Text Area */}
+
             <div className="relative">
               <textarea
                 value={inputText}
@@ -362,25 +387,30 @@ Remove '$' symbols from prices.`;
               </div>
             )}
 
-            <button
-              onClick={handleAnalyze}
-              disabled={isLoading || (!inputText.trim() && !fileName)}
-              className="w-full py-5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg hover:shadow-green-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xl group"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" /> Analyzing with AI...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" /> Analyze & Convert
-                </>
-              )}
-            </button>
+            <div className="space-y-4">
+              <button
+                onClick={handleAnalyze}
+                disabled={isLoading || (!inputText.trim() && !fileName)}
+                className="w-full py-5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg hover:shadow-green-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xl group"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin" /> Analyzing with AI...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" /> Analyze & Convert
+                  </>
+                )}
+              </button>
+              <div className="text-center">
+                <span className="text-sm text-slate-500 font-medium">Daily Usages Left: {Math.max(0, 10 - usageCount)}</span>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* STEP 2: Review Table */}
+
         {currentStep === 2 && (
           <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200 space-y-6">
             <div className="mb-8">
@@ -467,7 +497,7 @@ Remove '$' symbols from prices.`;
           </div>
         )}
 
-        {/* STEP 3: Success/Download */}
+
         {currentStep === 3 && (
           <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200 space-y-8 text-center">
             <div className="flex justify-center">
