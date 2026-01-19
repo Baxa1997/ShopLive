@@ -6,18 +6,28 @@ import { FeatureForm } from '@/components/ui-builder/FeatureForm';
 import { PromptOutput } from '@/components/ui-builder/PromptOutput';
 import { ComponentOption } from '@/lib/ui-builder-config';
 import { assemblePrompt } from '@/lib/prompt-engine';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, Zap } from 'lucide-react';
 
 import Link from 'next/link';
+
+import { ComponentPreviewModal } from '@/components/ui-builder/ComponentPreviewModal';
 
 export default function UIArchitectPage() {
   const [selectedComponent, setSelectedComponent] = useState<ComponentOption | null>(null);
   const [choices, setChoices] = useState<Record<string, string | boolean>>({});
   const [generatedPrompt, setGeneratedPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Modal State
+  const [previewComponent, setPreviewComponent] = useState<ComponentOption | null>(null);
 
-  const handleComponentSelect = (component: ComponentOption) => {
+  const handleComponentClick = (component: ComponentOption) => {
+    setPreviewComponent(component);
+  };
+
+  const handleConfirmSelect = (component: ComponentOption) => {
     setSelectedComponent(component);
+    setPreviewComponent(null);
     setChoices({}); // Reset choices
     setGeneratedPrompt(''); // Reset prompt
   };
@@ -43,12 +53,20 @@ export default function UIArchitectPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans pb-20 relative">
+      
+      <ComponentPreviewModal 
+        isOpen={!!previewComponent}
+        component={previewComponent}
+        onClose={() => setPreviewComponent(null)}
+        onConfirm={handleConfirmSelect}
+      />
+
       <div className="absolute top-6 left-6 z-10">
          <Link href="/" className="flex items-center gap-2 group cursor-pointer">
             <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all">
-                <Sparkles className="w-5 h-5 text-emerald-600" />
+                <Zap className="w-5 h-5 text-emerald-600" />
             </div>
-            <span className="font-heading font-bold text-lg text-slate-800 tracking-tight hidden md:block">Life Assistant</span>
+            <span className="font-heading font-bold text-lg text-slate-800 tracking-tight hidden md:block">LifeShop</span>
           </Link>
       </div>
 
@@ -74,7 +92,7 @@ export default function UIArchitectPage() {
             </h2>
             <ComponentSelector 
                 selectedId={selectedComponent?.id || null} 
-                onSelect={handleComponentSelect} 
+                onSelect={handleComponentClick} 
             />
         </section>
 

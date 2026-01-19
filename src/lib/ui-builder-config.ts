@@ -1,4 +1,4 @@
-import { AppWindow, Menu, LayoutTemplate } from 'lucide-react';
+import { AppWindow, Menu, LayoutTemplate, List, AlignJustify, PanelBottom } from 'lucide-react';
 import { ElementType } from 'react';
 
 export interface Feature {
@@ -68,7 +68,7 @@ export const UI_COMPONENTS: ComponentOption[] = [
   {
     id: 'hero',
     label: 'Hero Section',
-    icon: LayoutTemplate, // Using LayoutTemplate as a proxy for Hero Section generic icon
+    icon: LayoutTemplate, 
     features: [
       {
         id: 'layout',
@@ -89,5 +89,35 @@ export const UI_COMPONENTS: ComponentOption[] = [
         options: ['One', 'Two']
       }
     ]
+  },
+  {
+      id: 'cascading-menu',
+      label: 'Cascading Menu',
+      icon: List,
+      features: [
+        { id: 'trigger', label: 'Trigger', type: 'select', options: ['Hover', 'Click'] },
+        { id: 'depth', label: 'Max Depth', type: 'select', options: ['2 Levels', 'Unlimited'] },
+        { id: 'icons', label: 'Menu Icons', type: 'boolean' }
+      ]
+  },
+  {
+      id: 'menu',
+      label: 'Simple Menu',
+      icon: AlignJustify,
+      features: [
+        { id: 'orientation', label: 'Orientation', type: 'select', options: ['Horizontal', 'Vertical'] },
+        { id: 'divider', label: 'Dividers', type: 'boolean' },
+        { id: 'activeState', label: 'Active Style', type: 'select', options: ['Underline', 'Background'] }
+      ]
+  },
+  {
+      id: 'footer',
+      label: 'Site Footer',
+      icon: PanelBottom,
+      features: [
+        { id: 'columns', label: 'Columns', type: 'select', options: ['3', '4', 'Massive'] },
+        { id: 'newsletter', label: 'Newsletter', type: 'boolean' },
+        { id: 'socials', label: 'Social Icons', type: 'boolean' }
+      ]
   }
 ];

@@ -1,7 +1,27 @@
 import { Tool } from '@/types';
-import { Briefcase, Utensils, Mail, Zap, LayoutTemplate } from 'lucide-react';
+import { Briefcase, Utensils, Mail, Zap, LayoutTemplate, ShoppingBag, Package } from 'lucide-react';
 
 export const TOOLS: Tool[] = [
+  {
+      id: 'shopify-importer',
+      title: 'Shopify Product Importer',
+      description: 'Convert messy supplier data into perfect Shopify CSV files with our step-by-step wizard.',
+      icon: <Package className="w-6 h-6" />,
+      category: 'Work',
+      href: '/tools/shopify-importer',
+      systemPrompt: '',
+      inputs: []
+  },
+  {
+      id: 'amazon-generator',
+      title: 'Amazon Listing Optimizer',
+      description: 'Upload image & details to generate high-converting Amazon product copy.',
+      icon: <ShoppingBag className="w-6 h-6" />,
+      category: 'Work',
+      href: '/tools/amazon-generator',
+      systemPrompt: '',
+      inputs: []
+  },
   {
     id: 'bureaucracy-buster',
     title: 'Bureaucracy Buster',

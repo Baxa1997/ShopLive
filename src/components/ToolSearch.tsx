@@ -6,7 +6,7 @@ import { Category, Tool } from '@/types';
 import { TOOLS } from '@/data/toolsData';
 import ToolGrid from './ToolGrid';
 import ToolPanel from './ToolPanel';
-import { Sparkles, Search, Command, ArrowLeft } from 'lucide-react';
+import { Zap, Search, Command, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -59,9 +59,9 @@ export default function ToolSearch() {
         <div className="flex items-center justify-between mb-8 text-white/80">
           <Link href="/" className="flex items-center gap-2 hover:text-white transition-colors group cursor-pointer">
             <div className="bg-emerald-500/10 p-2 rounded-lg backdrop-blur-md border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-all">
-                <Sparkles className="w-5 h-5 text-emerald-400" />
+                <Zap className="w-5 h-5 text-emerald-400" />
             </div>
-            <span className="font-heading font-bold text-xl text-white tracking-tight">Life Assistant</span>
+            <span className="font-heading font-bold text-xl text-white tracking-tight">LifeShop</span>
           </Link>
         </div>
 

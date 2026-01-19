@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Sparkles, ArrowRight } from 'lucide-react';
+import { Check, Zap, Sparkles, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -17,9 +17,9 @@ export default function PricingPage() {
       <header className="relative z-10 px-6 py-6 flex justify-between items-center max-w-7xl mx-auto w-full">
          <Link href="/" className="flex items-center gap-2 group cursor-pointer">
             <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all">
-                <Sparkles className="w-5 h-5 text-emerald-600" />
+                <Zap className="w-5 h-5 text-emerald-600" />
             </div>
-            <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">Life Assistant</span>
+            <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">LifeShop</span>
           </Link>
       </header>
 

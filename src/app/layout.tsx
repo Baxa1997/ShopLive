@@ -15,8 +15,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Life Assistant Dashboard | Premium AI Tools",
-  description: "A premium dashboard for your daily AI-assisted tasks.",
+  title: "LifeShop | Premium Shop Assistant Dashboard",
+  description: "Advanced AI tools suite for productivity and business automation.",
 };
 
 export default function RootLayout({

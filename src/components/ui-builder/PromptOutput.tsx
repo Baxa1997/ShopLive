@@ -14,18 +14,15 @@ export function PromptOutput({ prompt, isGenerating, onGenerationComplete }: Pro
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
-    // If we are currently "generating" or if the prompt changed effectively, we start typing
-    // However, the parent controls the prompt. 
-    // If prompt is empty, show nothing.
     if (!prompt) {
         setDisplayedText('');
         return;
     }
 
-    setDisplayedText(''); // Reset
+    setDisplayedText(''); 
     
     let i = -1;
-    const speed = 20; // ms per char
+    const speed = 20; 
 
     const intervalId = setInterval(() => {
         i++;
