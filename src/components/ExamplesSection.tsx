@@ -55,7 +55,7 @@ export default function ExamplesSection() {
                   {/* Before */}
                   <div className="bg-slate-100/50 p-4 rounded-xl border border-dashed border-slate-300">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Input</span>
-                    <p className="text-slate-600 font-mono text-sm">"{example.before}"</p>
+                    <p className="text-slate-600 font-mono text-sm">&quot;{example.before}&quot;</p>
                   </div>
 
                   <div className="flex justify-center">

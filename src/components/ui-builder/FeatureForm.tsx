@@ -12,7 +12,10 @@ export function FeatureForm({ component, choices, onChange }: FeatureFormProps) 
   return (
     <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100 h-full">
       <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-800">
-        <component.icon className="w-6 h-6 text-emerald-600" />
+        {(() => {
+          const Icon = component.icon as any;
+          return <Icon className="w-6 h-6 text-emerald-600" />;
+        })()}
         Configure {component.label}
       </h2>
       

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, ShoppingBag, Sparkles, AlertCircle, Zap } from 'lucide-react';
+import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
@@ -183,7 +183,11 @@ Remove '$' symbols from prices.`;
 
   const handleProductChange = (index: number, field: keyof ProductRow, value: string) => {
     const updated = [...products];
-    updated[index][field] = value;
+    if (field === 'variant_grams' || field === 'variant_inventory_qty') {
+      (updated[index][field] as number) = Number(value);
+    } else {
+      (updated[index][field] as string) = value;
+    }
     setProducts(updated);
   };
 
@@ -295,7 +299,7 @@ Remove '$' symbols from prices.`;
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-slate-900 mb-3">Upload Supplier Data</h2>
               <p className="text-slate-600">
-                Paste text from your supplier's PDF, email, or spreadsheet. We will format it for Shopify.
+                Paste text from your supplier&apos;s PDF, email, or spreadsheet. We will format it for Shopify.
               </p>
             </div>
 

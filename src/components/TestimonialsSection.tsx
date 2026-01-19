@@ -63,7 +63,7 @@ export default function TestimonialsSection() {
               </div>
               
               <p className="text-slate-700 italic mb-6 leading-relaxed">
-                "{t.content}"
+                &quot;{t.content}&quot;
               </p>
               
               <div className="flex items-center gap-4">

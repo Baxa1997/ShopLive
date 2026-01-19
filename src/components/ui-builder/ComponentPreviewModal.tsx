@@ -57,7 +57,7 @@ export function ComponentPreviewModal({ component, isOpen, onClose, onConfirm }:
                  <div className="flex items-start justify-between mb-6">
                     <div className="p-3 bg-emerald-50 rounded-xl">
                         {(() => {
-                            const Icon = component.icon;
+                            const Icon = component.icon as any;
                             return <Icon className="w-8 h-8 text-emerald-600" />;
                         })()}
                     </div>

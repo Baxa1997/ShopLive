@@ -30,7 +30,10 @@ export function ComponentSelector({ selectedId, onSelect }: ComponentSelectorPro
                 : "border-gray-100 text-gray-600 hover:border-emerald-200 hover:text-emerald-600"
             )}
           >
-            <Icon className={cn("w-12 h-12 mb-3", isSelected ? "text-emerald-600" : "text-gray-400")} />
+            {(() => {
+              const Icon = component.icon as any;
+              return <Icon className={cn("w-12 h-12 mb-3", isSelected ? "text-emerald-600" : "text-gray-400")} />;
+            })()}
             <span className="font-semibold">{component.label}</span>
           </motion.button>
         );
