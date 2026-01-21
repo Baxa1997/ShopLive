@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag } from 'lucide-react';
+import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
@@ -547,12 +547,12 @@ CRITICAL RULES:
 
 
         {currentStep === 2 && (
-          <div className="space-y-6">
+          <div className="space-y-10">
             {/* Sticky Header */}
-            <div className="sticky top-4 z-40 bg-white/80 backdrop-blur-md rounded-2xl p-4 md:p-6 shadow-lg border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 transition-all">
+            <div className="sticky top-4 z-40 bg-white/80 backdrop-blur-md rounded-2xl p-3 md:p-4 shadow-lg border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-3 transition-all">
               <div className="text-center md:text-left">
-                <h2 className="text-xl md:text-2xl font-bold text-slate-900 leading-none mb-1">Review Your Products</h2>
-                <p className="text-[11px] font-medium text-slate-500 uppercase tracking-widest">
+                <h2 className="text-lg md:text-xl font-bold text-slate-900 leading-none mb-1">Review Your Products</h2>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
                   <span className="text-green-600 font-black">{products.length} Products</span> • {products.reduce((acc, p) => acc + p.shopify_fields.variants.length, 0)} Variants Detected
                 </p>
               </div>
@@ -567,182 +567,199 @@ CRITICAL RULES:
                   onClick={() => setCurrentStep(3)}
                   className="flex-1 md:flex-none px-5 py-2.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-all shadow-lg flex items-center justify-center gap-2"
                 >
-                  Finish <ArrowRight className="w-4 h-4" />
+                  Confirm & Sync <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             <div className="space-y-6">
               {products.map((product, pIdx) => (
-                <div key={product.internal_id} className="border border-slate-200 rounded-2xl p-4 md:p-5 bg-white ring-1 ring-slate-100 shadow-sm">
-                  {/* Product Header Info */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-                    <div className="lg:col-span-2 space-y-3">
-                      <div className="flex flex-wrap gap-3">
-                        <div className="flex-1 min-w-[200px]">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block tracking-wider">Product Title</label>
-                          <input
-                            type="text"
-                            value={product.shopify_fields.title}
-                            onChange={(e) => handleShopifyChange(pIdx, 'title', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-orange-50/30 border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
-                          />
+                <div key={product.internal_id || pIdx} className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden animate-in fade-in duration-300">
+                  <div className="p-4 md:p-6 space-y-6">
+                    {/* Header Row */}
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center font-bold text-sm">
+                          {pIdx + 1}
                         </div>
-                        <div className="w-32">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block tracking-wider">Vendor</label>
-                          <input
-                            type="text"
-                            value={product.shopify_fields.vendor}
-                            onChange={(e) => handleShopifyChange(pIdx, 'vendor', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
-                          />
+                        <div>
+                          <h3 className="font-bold text-slate-900 text-sm">Product #{pIdx + 1}</h3>
+                          <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Review detected information</p>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-3">
-                         <div className="flex-1 min-w-[150px]">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block tracking-wider">Handle</label>
-                          <input
-                            type="text"
-                            value={product.shopify_fields.handle}
-                            onChange={(e) => handleShopifyChange(pIdx, 'handle', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs font-mono text-slate-500 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-[150px]">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block tracking-wider">Product Type</label>
-                          <input
-                            type="text"
-                            value={product.shopify_fields.product_type}
-                            onChange={(e) => handleShopifyChange(pIdx, 'product_type', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
-                          />
-                        </div>
+                      <div className="flex gap-2">
+                        <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-bold rounded-full border border-emerald-100 uppercase tracking-tight">Shopify Ready</div>
+                        <div className="px-2 py-0.5 bg-orange-50 text-orange-700 text-[9px] font-bold rounded-full border border-orange-100 uppercase tracking-tight">Amazon Ready</div>
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-sm relative overflow-hidden group/amazon">
-                      <div className="absolute top-0 right-0 w-1 h-full bg-orange-400 opacity-50" />
-                      <div className="flex items-center justify-between mb-2">
-                         <span className="flex items-center gap-1.5 text-orange-600 font-bold text-[10px] uppercase tracking-tight">
-                            <Package className="w-3 h-3" /> Amazon Ready
-                         </span>
-                         <button 
-                            onClick={() => setActiveAmazonToolId(activeAmazonToolId === product.internal_id ? null : product.internal_id)}
-                            className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2 transition-colors"
-                          >
-                           {activeAmazonToolId === product.internal_id ? 'Hide' : '✨ View'}
-                         </button>
-                      </div>
-                      <div className="space-y-1.5">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] font-bold text-slate-400 uppercase">Category</span>
-                          <span className="text-[10px] text-slate-700 font-bold bg-white px-2 py-0.5 rounded border border-slate-100">{product.amazon_fields.category_suggestion}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] font-bold text-slate-400 uppercase">Keyword</span>
-                          <span className="text-[10px] text-slate-700 font-medium font-mono truncate">{product.amazon_fields.inventory_loader_mapping.item_type_keyword}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Amazon View Expansion */}
-                  {activeAmazonToolId === product.internal_id && (
-                    <div className="mb-6 p-5 bg-orange-50/50 border border-orange-100 rounded-xl space-y-4 animate-in slide-in-from-top-4 duration-500 ease-out">
-                      <div className="flex items-center justify-between">
-                         <h4 className="font-bold text-orange-900 flex items-center gap-2 text-sm">
-                          <Sparkles className="w-4 h-4 text-orange-500" /> AI Bullet Points
-                        </h4>
-                        <span className="text-[8px] font-bold text-orange-400 bg-orange-100 px-2 py-0.5 rounded uppercase font-mono">SEO Enabled</span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
-                        {product.amazon_fields.bullet_points.map((bp, i) => (
-                          <div key={i} className="flex gap-2 text-[10px] text-slate-700 bg-white/80 p-3 rounded-lg border border-orange-200/30 shadow-sm transition-all">
-                            <span className="font-black text-orange-300 shrink-0">#{i + 1}</span>
-                            <p className="leading-relaxed text-slate-600 line-clamp-4">{bp}</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Left: Product Info */}
+                      <div className="lg:col-span-2 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Title</label>
+                            <input
+                              type="text"
+                              value={product.shopify_fields.title}
+                              onChange={(e) => handleShopifyChange(pIdx, 'title', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-slate-900 outline-none transition-all"
+                            />
                           </div>
-                        ))}
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Vendor</label>
+                            <input
+                              type="text"
+                              value={product.shopify_fields.vendor}
+                              onChange={(e) => handleShopifyChange(pIdx, 'vendor', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-slate-700 outline-none transition-all"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Handle / URL</label>
+                            <input
+                              type="text"
+                              value={product.shopify_fields.handle}
+                              onChange={(e) => handleShopifyChange(pIdx, 'handle', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-400 text-xs font-mono text-slate-600 outline-none"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Type / Category</label>
+                            <input
+                              type="text"
+                              value={product.shopify_fields.product_type}
+                              onChange={(e) => handleShopifyChange(pIdx, 'product_type', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 text-sm font-semibold text-slate-700 outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Marketplace Info */}
+                      <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-200">
+                        <div className="flex items-center justify-between border-b border-slate-300 pb-2">
+                          <span className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">Marketplace AI</span>
+                          <button 
+                            onClick={() => setActiveAmazonToolId(activeAmazonToolId === product.internal_id ? null : product.internal_id)}
+                            className="text-[9px] font-bold text-orange-600 hover:text-orange-700 underline"
+                          >
+                            {activeAmazonToolId === product.internal_id ? 'Hide Details' : 'View AI Bullet Points'}
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="space-y-0.5">
+                            <span className="text-[8px] font-bold text-slate-500 uppercase">Amazon Category</span>
+                            <p className="text-xs font-bold text-slate-700 truncate">{product.amazon_fields.category_suggestion}</p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <span className="text-[8px] font-bold text-slate-500 uppercase">Search Keyword</span>
+                            <p className="text-xs font-mono text-slate-500 truncate">{product.amazon_fields.inventory_loader_mapping.item_type_keyword}</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  )}
 
-                  {/* Variants Table */}
-                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-900/5 mt-6">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          <th className="text-left p-3">Option Value</th>
-                          <th className="text-left p-3">Price ($)</th>
-                          <th className="text-left p-3">SKU</th>
-                          <th className="text-left p-3">Qty</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {product.shopify_fields.variants.map((variant, vIdx) => (
-                          <tr key={vIdx} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/30 transition-colors">
-                            <td className="p-2.5">
-                              <input
-                                type="text"
-                                value={variant.option1_value}
-                                onChange={(e) => handleVariantChange(pIdx, vIdx, 'option1_value', e.target.value)}
-                                className="w-full px-2 py-1 rounded border border-transparent focus:border-green-200 bg-transparent text-xs font-bold text-slate-800"
-                              />
-                            </td>
-                            <td className="p-2.5 w-24">
-                              <div className="flex items-center">
-                                <span className="text-slate-300 text-[10px] mr-1">$</span>
-                                <input
-                                  type="text"
-                                  value={variant.variant_price}
-                                  onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_price', e.target.value)}
-                                  className="w-full px-1 py-1 rounded border border-transparent focus:border-green-200 bg-transparent text-xs font-medium text-slate-600"
-                                />
-                              </div>
-                            </td>
-                            <td className="p-2.5">
-                              <input
-                                type="text"
-                                value={variant.variant_sku}
-                                onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_sku', e.target.value)}
-                                className="w-full px-2 py-1 rounded border border-transparent focus:border-green-200 bg-transparent text-[10px] font-mono text-slate-400"
-                              />
-                            </td>
-                            <td className="p-2.5 w-20">
-                              <input
-                                type="number"
-                                value={variant.variant_inventory_qty}
-                                onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_inventory_qty', e.target.value)}
-                                className="w-full px-2 py-1 rounded border border-transparent focus:border-green-200 bg-transparent text-xs text-slate-600"
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {/* AI Preview Section */}
+                    {activeAmazonToolId === product.internal_id && (
+                      <div className="p-4 bg-slate-900 rounded-xl text-white animate-in slide-in-from-top-2 duration-300">
+                        <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-3">AI Suggested Bullet Points</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {product.amazon_fields.bullet_points.map((bp, i) => (
+                            <div key={i} className="text-[11px] text-slate-300 leading-relaxed border-l-2 border-emerald-500/30 pl-2">
+                              {bp}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Variants Table */}
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">Product Variants</h4>
+                      <div className="border border-slate-300 rounded-lg overflow-hidden shadow-sm">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="bg-slate-100 border-b border-slate-300">
+                              <th className="p-2 font-bold text-slate-600 uppercase tracking-tighter">Variant Value</th>
+                              <th className="p-2 font-bold text-slate-600 text-center uppercase tracking-tighter">Price</th>
+                              <th className="p-2 font-bold text-slate-600 uppercase tracking-tighter">SKU</th>
+                              <th className="p-2 font-bold text-slate-600 text-center uppercase tracking-tighter">Stock</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {product.shopify_fields.variants.map((v, vIdx) => (
+                              <tr key={vIdx} className="hover:bg-slate-50 transition-colors">
+                                <td className="p-2">
+                                  <input
+                                    type="text"
+                                    value={v.option1_value}
+                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'option1_value', e.target.value)}
+                                    className="w-full bg-transparent font-bold text-slate-900 outline-none border-b border-transparent focus:border-emerald-500"
+                                  />
+                                </td>
+                                <td className="p-2 w-24 border-x border-slate-200">
+                                  <div className="flex items-center justify-center">
+                                    <span className="text-slate-400 mr-0.5">$</span>
+                                    <input
+                                      type="text"
+                                      value={v.variant_price}
+                                      onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_price', e.target.value)}
+                                      className="w-12 bg-transparent font-bold text-slate-700 outline-none text-center"
+                                    />
+                                  </div>
+                                </td>
+                                <td className="p-2 border-r border-slate-200">
+                                  <input
+                                    type="text"
+                                    value={v.variant_sku}
+                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_sku', e.target.value)}
+                                    className="w-full bg-transparent font-mono text-[10px] text-slate-500 outline-none"
+                                  />
+                                </td>
+                                <td className="p-2 w-20 text-center">
+                                  <input
+                                    type="number"
+                                    value={v.variant_inventory_qty}
+                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_inventory_qty', e.target.value)}
+                                    className="w-full bg-transparent font-bold text-emerald-600 outline-none text-center"
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-
-            <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-6 border-t border-slate-200/60">
+            {/* Back & Next Actions */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-10 border-t border-slate-200/60 max-w-4xl mx-auto">
               <button
                 onClick={() => setCurrentStep(1)}
-                className="px-6 py-3 text-slate-400 font-bold hover:text-slate-900 transition-all flex items-center gap-2 group/back text-sm"
+                className="px-8 py-4 text-slate-400 font-black hover:text-slate-900 transition-all flex items-center gap-3 group/back text-sm uppercase tracking-widest"
               >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Edit
+                <div className="w-10 h-10 rounded-xl border-2 border-slate-100 flex items-center justify-center group-hover/back:border-slate-900 group-hover/back:bg-slate-900 group-hover/back:text-white transition-all">
+                  <ArrowLeft className="w-5 h-5" />
+                </div>
+                Return to Inputs
               </button>
               <div className="flex gap-4 w-full md:w-auto">
                 <button
                   onClick={() => setCurrentStep(3)}
-                  className="flex-1 md:flex-none px-8 py-3 bg-green-600 text-white font-black rounded-xl hover:bg-green-700 transition-all shadow-xl shadow-green-500/20 flex items-center justify-center gap-2 text-base ring-2 ring-white"
+                  className="flex-1 md:flex-none px-12 py-5 bg-emerald-600 text-white font-black rounded-[1.5rem] hover:bg-emerald-700 transition-all shadow-2xl shadow-emerald-500/30 flex items-center justify-center gap-3 text-lg ring-4 ring-white"
                 >
-                  Confirm & Sync <ArrowRight className="w-5 h-5" />
+                  Confirm & Sync All <ArrowRight className="w-6 h-6 animate-pulse" />
                 </button>
               </div>
             </div>
           </div>
         )}
-
 
         {currentStep === 3 && (
           <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-2xl border border-slate-100 text-center max-w-xl mx-auto relative overflow-hidden">
