@@ -19,7 +19,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "ShopsReady | Ultimate Shopify Product Importer & E-commerce Tools",
   description: "Convert PDFs and images into Shopify-ready CSV files instantly. ShopsReady is the #1 tool for Shopify merchants to automate product listing and catalog management.",
-  keywords: ["Shopify product importer", "PDF to Shopify CSV", "AI e-commerce tools", "ShopsReady", "automated product listings"],
+  keywords: ["Shopify product importer", "Amazon product importer", "fba", "shopsready", "shops ready", "pdf to shopify csv", "pdf to csv shopify", "pdf to csv amazon", "pdf to csv fba", "AI e-commerce tools", "ShopsReady", "automated product listings"],
   authors: [{ name: "ShopsReady Team" }],
   metadataBase: new URL("https://shopsready.com"),
   alternates: {
