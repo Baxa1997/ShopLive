@@ -13,10 +13,10 @@ export default function AmazonExampleSection() {
             <span>Featured Tool</span>
           </div>
           <h2 className="text-3xl md:text-5xl font-heading font-bold text-slate-900 mb-4">
-            Amazon Listing <span className="text-orange-500">Transformation</span>
+            Amazon Listing <span className="text-orange-500">Ready in Seconds</span>
           </h2>
           <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-            See how our AI transforms raw product notes into a high-converting, keyword-rich listing.
+            Generate high-converting Amazon Listing CSVs and Bullet points optimized for Seller Central.
           </p>
         </div>
 

@@ -6,24 +6,24 @@ import { Star } from 'lucide-react';
 const TESTIMONIALS = [
   {
     name: 'Sarah Chen',
-    role: 'Social Media Manager',
-    content: 'The Caption Creator saves me hours every week. The tones are spot on and engagement has actually increased!',
+    role: 'E-commerce Brand Owner',
+    content: "The unified importer is a game-changer! I generated my Shopify CSV and Amazon listings in under 60 seconds. The bullet points are perfectly optimized for SEO.",
     stars: 5,
     avatar: 'SC'
   },
   {
     name: 'David Miller',
-    role: 'Freelance Writer',
-    content: 'Bureaucracy Buster is a lifesaver. I use it to explain complex contracts to my clients in plain English.',
+    role: 'Dropshipping Expert',
+    content: "Finally a tool that understands variant mapping. My Shopify import was flawless, and the Amazon category suggestions saved me hours of manual research.",
     stars: 5,
     avatar: 'DM'
   },
   {
-    name: 'Jessica Lee',
-    role: 'Home Cook',
-    content: 'Fridge Chef is surprisingly creative. I made a delicious pasta dish with just leftovers I was about to throw away.',
-    stars: 4,
-    avatar: 'JL'
+    name: 'Michael Ross',
+    role: 'Marketplace Manager',
+    content: "Syncing across channels used to take days. Now it's one click. The AI-generated Shopify handles and Amazon keywords are incredibly accurate and professional.",
+    stars: 5,
+    avatar: 'MR'
   }
 ];
 

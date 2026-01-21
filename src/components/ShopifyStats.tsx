@@ -56,7 +56,7 @@ export default function ShopifyStats() {
             viewport={{ once: true }}
             className="text-3xl md:text-4xl font-heading font-extrabold text-slate-900 tracking-tight mb-4"
           >
-            Empowering <span className="text-emerald-600">Shopify Merchants</span> Worldwide
+            Empowering <span className="text-emerald-600">Shopify</span> & <span className="text-orange-500">Amazon Sellers</span> Worldwide
           </motion.h2>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}

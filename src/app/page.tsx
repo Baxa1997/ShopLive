@@ -18,7 +18,6 @@ export default function Home() {
       <ShopifyStats />
       <PartnersSection />
       <FeaturesSection />
-      <AmazonExampleSection />
       <ExamplesSection />
       <TestimonialsSection />
       <SiteFooter />

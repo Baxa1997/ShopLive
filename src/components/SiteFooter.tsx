@@ -1,6 +1,6 @@
 'use client';
 
-import { Package, Mail, Twitter, Github } from 'lucide-react';
+import { Package, Mail, Phone, Share2, Twitter, Github } from 'lucide-react';
 
 export default function SiteFooter() {
   return (
@@ -36,21 +36,26 @@ export default function SiteFooter() {
             </ul>
           </div>
 
-          {/* Contact Column */}
           <div className="space-y-4">
-            <h3 className="text-white font-heading font-semibold text-lg">Connect</h3>
-            <ul className="space-y-2">
-              <li className="flex items-center gap-2">
-                <Twitter className="w-4 h-4 text-slate-500" />
-                <a href="#" className="hover:text-emerald-400 transition-colors">Twitter</a>
+            <h3 className="text-white font-heading font-semibold text-lg">Contact Us</h3>
+            <ul className="space-y-3">
+              <li className="flex items-center gap-3">
+                <div className="p-2 bg-slate-800 rounded-lg text-emerald-400">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <a href="mailto:bahridnurullav@gmail.com" className="hover:text-emerald-400 transition-colors">bahridnurullav@gmail.com</a>
               </li>
-              <li className="flex items-center gap-2">
-                <Github className="w-4 h-4 text-slate-500" />
-                <a href="#" className="hover:text-emerald-400 transition-colors">GitHub</a>
+              <li className="flex items-center gap-3">
+                <div className="p-2 bg-slate-800 rounded-lg text-emerald-400">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <a href="tel:+16289002850" className="hover:text-emerald-400 transition-colors">+1 (628) 900-2850</a>
               </li>
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-slate-500" />
-                <a href="mailto:support@shopsready.com" className="hover:text-emerald-400 transition-colors">support@shopsready.com</a>
+              <li className="flex items-center gap-3 opacity-50">
+                <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
+                  <Share2 className="w-4 h-4" />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-wider">Follow our progress</span>
               </li>
             </ul>
           </div>

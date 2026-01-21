@@ -3,12 +3,12 @@ import { Briefcase, Utensils, Mail, Zap, LayoutTemplate, ShoppingBag, Package } 
 
 export const TOOLS: Tool[] = [
   {
-      id: 'shopify-importer',
-      title: 'Shopify Product Importer',
-      description: 'Convert messy supplier data into perfect Shopify CSV files with our step-by-step wizard.',
+      id: 'multi-importer',
+      title: 'Multi-Channel Importer',
+      description: 'Sync supplier products across Shopify and Amazon in minutes.',
       icon: <Package className="w-6 h-6" />,
       category: 'Work',
-      href: '/tools/shopify-importer',
+      href: '/tools/multi-importer',
       systemPrompt: '',
       inputs: []
   },

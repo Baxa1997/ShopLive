@@ -29,14 +29,14 @@ export default function MagicTextTransform() {
   useEffect(() => {
     const transformTimer = setTimeout(() => {
       setIsTransformed(true);
-    }, 2000);
+    }, 500);
 
     const cycleTimer = setTimeout(() => {
       setIsTransformed(false);
       setTimeout(() => {
         setCurrentIndex((prev) => (prev + 1) % transformations.length);
-      }, 800);
-    }, 6000);
+      }, 400);
+    }, 500);
 
     return () => {
       clearTimeout(transformTimer);
@@ -47,7 +47,7 @@ export default function MagicTextTransform() {
   const current = transformations[currentIndex];
 
   return (
-    <div className="absolute top-1/3 -translate-y-1/2 right-10 md:right-20 w-[320px] pointer-events-none z-0 hidden lg:block">
+    <div className="absolute top-1/5 -translate-y-1/2 right-10 md:right-10 w-[320px] pointer-events-none z-0 hidden lg:block">
       <div className="relative">
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
@@ -68,7 +68,7 @@ export default function MagicTextTransform() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.1 }}
                 className="space-y-2"
               >
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Before</div>
@@ -82,7 +82,7 @@ export default function MagicTextTransform() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.1 }}
                 className="space-y-2"
               >
                 <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
@@ -128,8 +128,8 @@ export default function MagicTextTransform() {
                       y: Math.sin((i / 8) * Math.PI * 2) * 60
                     }}
                     transition={{ 
-                      duration: 1.5,
-                      delay: i * 0.1,
+                      duration: 0.8,
+                      delay: i * 0.05,
                       ease: "easeOut"
                     }}
                     className="absolute top-1/2 left-1/2 w-1.5 h-1.5 bg-emerald-400 rounded-full"

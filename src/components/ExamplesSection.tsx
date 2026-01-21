@@ -5,18 +5,18 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 
 const EXAMPLES = [
   {
-    title: 'Instagram Caption',
-    before: 'photo of me and friends at beach',
-    after: 'Salt water, sun-kissed hair, and the best crew. 🌊✨ Living for these golden hour moments that turn into forever memories. #SummerVibes #BeachDays #SquadGoals',
-    color: 'from-purple-500 to-pink-500',
-    icon: '📸'
+    title: 'Shopify CSV Import',
+    before: 'Blue Jacket, SKU: BJ-01, Size: S, M, L, Price: 45',
+    after: 'Shopify-ready CSV generated. Handles: blue-jacket, Tags: Outerwear, 3 variants mapped (BJ-01-S, BJ-01-M, BJ-01-L) with automatic inventory sync. $45.00',
+    color: 'from-emerald-500 to-teal-500',
+    icon: '📦'
   },
   {
-    title: 'Professional Email',
-    before: 'hey boss i feel sick wont allow me to come',
-    after: 'Hi [Name], I am writing to let you know that I am feeling unwell today and will need to take a sick day to recover. I will ensure any urgent tasks are delegated or addressed upon my return. Best regards.',
-    color: 'from-blue-500 to-indigo-600',
-    icon: '📧'
+    title: 'Multi-Channel Sync',
+    before: 'Upload PDF supplier_catalog.pdf',
+    after: 'Extracted 15 products. Generated Shopify CSV + Amazon Listing Text. SEO-optimized bullet points and category mapping applied for instant cross-channel selling.',
+    color: 'from-orange-500 to-amber-500',
+    icon: '🔄'
   },
 ];
 
