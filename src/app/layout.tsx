@@ -37,7 +37,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "ShopsReady | Shopify Tools",
     description: "Transform your Shopify store with automation.",
-  }
+  },
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -54,6 +59,8 @@ export default function RootLayout({
           crossOrigin="anonymous"
           strategy="afterInteractive"
         />
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9753691394615647"
+     crossorigin="anonymous"></script>
       </head>
       <body
         className={`${outfit.variable} ${inter.variable} font-sans antialiased`}

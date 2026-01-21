@@ -338,8 +338,8 @@ Remove '$' symbols from prices.`;
                 <div className="h-px flex-1 bg-slate-200" />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative">
+              <div className="space-y-6">
+                <div className="relative w-full">
                   <input
                     type="file"
                     accept=".txt,.csv,.pdf,image/*"
@@ -349,35 +349,48 @@ Remove '$' symbols from prices.`;
                   />
                   <label 
                     htmlFor="file-upload"
-                    className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-green-300 rounded-xl bg-green-50/50 hover:bg-green-50 hover:border-green-400 transition-all cursor-pointer group h-48"
+                    className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-green-300 rounded-xl bg-green-50/50 hover:bg-green-50 hover:border-green-400 transition-all cursor-pointer group h-44 shadow-sm"
                   >
-                    <Upload className="w-10 h-10 text-green-600 mb-3 group-hover:scale-110 transition-transform" />
-                    <span className="font-bold text-slate-900 mb-1">Upload File</span>
+                    <Upload className="w-12 h-12 text-green-600 mb-3 group-hover:scale-110 transition-transform" />
+                    <span className="font-bold text-slate-900 text-lg mb-1">Upload File</span>
                     <span className="text-sm text-slate-500 text-center">PDF, Image, TXT, or CSV</span>
                     {fileName && (
-                      <div className="mt-3 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium truncate max-w-full">
+                      <div className="mt-3 px-4 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-bold truncate max-w-full">
                         {fileName}
                       </div>
                     )}
                   </label>
                 </div>
 
-                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 hover:bg-slate-50 hover:border-slate-400 transition-all h-48 group">
-                  <FileSpreadsheet className="w-10 h-10 text-slate-400 mb-3 group-hover:text-slate-600 transition-colors" />
-                  <span className="font-bold text-slate-900 mb-1">Or Paste Below</span>
-                  <span className="text-sm text-slate-500 text-center">Type or copy your data</span>
+                <div className="relative flex items-center gap-4 py-2">
+                  <div className="h-px flex-1 bg-slate-200" />
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">OR</span>
+                  <div className="h-px flex-1 bg-slate-200" />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-slate-700">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <FileSpreadsheet className="w-5 h-5 text-slate-500" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-900 block">Or Paste Below</span>
+                        <span className="text-xs text-slate-400 font-medium">Type or copy your data manually</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="relative">
+                    <textarea
+                      value={inputText}
+                      onChange={(e) => setInputText(e.target.value)}
+                      placeholder="Example: Blue Shirt, Size M, SKU: 123, Price: $15.00&#10;Red Jacket, Size L, SKU: 456, Price: $45.00&#10;White Sneakers, Size 10, SKU: 789, Price: $89.99"
+                      className="w-full min-h-[240px] p-6 rounded-2xl bg-slate-50 border-2 border-slate-200 focus:border-green-500 focus:outline-none focus:bg-white transition-all resize-none font-mono text-sm text-slate-700 shadow-inner"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-
-
-            <div className="relative">
-              <textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Example: Blue Shirt, Size M, SKU: 123, Price: $15.00&#10;Red Jacket, Size L, SKU: 456, Price: $45.00&#10;White Sneakers, Size 10, SKU: 789, Price: $89.99"
-                className="w-full min-h-[280px] p-6 rounded-xl bg-slate-50 border-2 border-slate-200 focus:border-green-400 focus:outline-none focus:bg-white transition-all resize-none font-mono text-sm text-slate-700"
-              />
             </div>
 
             {error && (
