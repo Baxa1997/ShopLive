@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Zap } from 'lucide-react';
+import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
@@ -276,7 +276,7 @@ Remove '$' symbols from prices.`;
       <div className="absolute top-6 left-6 z-10">
         <Link href="/" className="flex items-center gap-2 group cursor-pointer">
           <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all">
-            <Zap className="w-5 h-5 text-emerald-600" />
+            <Package className="w-5 h-5 text-emerald-600" />
           </div>
           <span className="font-heading font-bold text-lg text-slate-800 tracking-tight hidden md:block">ShopsReady</span>
         </Link>

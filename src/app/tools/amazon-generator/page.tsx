@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, Copy, ShoppingBag, Loader2, Sparkles, X, List as ListIcon, FileText, Tag, Zap } from 'lucide-react';
+import { Upload, Copy, ShoppingBag, Loader2, Sparkles, X, List as ListIcon, FileText, Tag, Package } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AmazonGeneratorPage() {
@@ -72,7 +72,7 @@ export default function AmazonGeneratorPage() {
        <div className="absolute top-6 left-6 z-10">
          <Link href="/" className="flex items-center gap-2 group cursor-pointer">
             <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all">
-                <Zap className="w-5 h-5 text-emerald-600" />
+                <Package className="w-5 h-5 text-emerald-600" />
             </div>
             <span className="font-heading font-bold text-lg text-slate-800 tracking-tight hidden md:block">ShopsReady</span>
           </Link>

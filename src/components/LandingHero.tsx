@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles, ShoppingBag, Share2, Package, LayoutTemplate, Zap } from 'lucide-react';
+import { ArrowRight, Sparkles, ShoppingBag, Share2, Package, LayoutTemplate } from 'lucide-react';
 import { Category } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -53,18 +53,11 @@ export default function LandingHero() {
             {/* Logo */}
             <div className="flex items-center gap-2">
                  <div className="bg-white/80 p-2 rounded-lg backdrop-blur-md border border-emerald-500/10 shadow-sm">
-                    <Zap className="w-5 h-5 text-emerald-600" />
+                    <Package className="w-5 h-5 text-emerald-600" />
                 </div>
                 <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">ShopsReady</span>
             </div>
 
-            {/* Navigation Items */}
-            <Link 
-                href="/pricing"
-                className="px-6 py-2.5 rounded-xl bg-white/80 backdrop-blur-md border border-slate-200 text-slate-700 font-semibold shadow-sm hover:shadow-md hover:text-emerald-600 hover:border-emerald-200 transition-all cursor-pointer"
-            >
-                Pricing
-            </Link>
         </div>
       </nav>
 
@@ -86,7 +79,7 @@ export default function LandingHero() {
           transition={{ delay: 0.1, duration: 0.5 }}
           className="text-5xl md:text-7xl font-heading font-extrabold text-slate-900 tracking-tight mb-8 leading-[1.1]"
         >
-          Ultimate AI <br />
+          Ultimate <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600">
             Shopify Importer
           </span>

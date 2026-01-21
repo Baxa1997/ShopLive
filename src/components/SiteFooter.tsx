@@ -1,6 +1,6 @@
 'use client';
 
-import { Zap, Mail, Twitter, Github, Heart } from 'lucide-react';
+import { Package, Mail, Twitter, Github } from 'lucide-react';
 
 export default function SiteFooter() {
   return (
@@ -17,7 +17,7 @@ export default function SiteFooter() {
           <div className="col-span-1 md:col-span-2 space-y-4">
             <div className="flex items-center gap-2 text-white mb-2">
               <div className="bg-emerald-600 p-1.5 rounded-lg">
-                <Zap className="w-5 h-5" />
+                <Package className="w-5 h-5" />
               </div>
               <span className="text-xl font-heading font-bold tracking-tight">ShopsReady</span>
             </div>
@@ -32,7 +32,6 @@ export default function SiteFooter() {
             <ul className="space-y-2">
               <li><a href="#" className="hover:text-emerald-400 transition-colors">Home</a></li>
               <li><a href="#" className="hover:text-emerald-400 transition-colors">All Tools</a></li>
-              <li><a href="#" className="hover:text-emerald-400 transition-colors">Pricing</a></li>
               <li><a href="#" className="hover:text-emerald-400 transition-colors">Updates</a></li>
             </ul>
           </div>
@@ -59,9 +58,6 @@ export default function SiteFooter() {
 
         <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500">
           <p>© 2026 ShopsReady. All rights reserved.</p>
-          <p className="flex items-center gap-1">
-            Made with <Heart className="w-4 h-4 text-red-500 fill-red-500/20" /> by Antigravity
-          </p>
         </div>
       </div>
     </footer>
