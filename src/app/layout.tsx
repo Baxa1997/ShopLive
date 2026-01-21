@@ -60,7 +60,7 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9753691394615647"
-     crossorigin="anonymous"></script>
+     crossOrigin="anonymous"></script>
       </head>
       <body
         className={`${outfit.variable} ${inter.variable} font-sans antialiased`}
