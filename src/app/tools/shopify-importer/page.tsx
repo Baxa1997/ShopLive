@@ -375,7 +375,7 @@ Remove '$' symbols from prices.`;
                         <FileSpreadsheet className="w-5 h-5 text-slate-500" />
                       </div>
                       <div>
-                        <span className="font-bold text-slate-900 block">Or Paste Below</span>
+
                         <span className="text-xs text-slate-400 font-medium">Type or copy your data manually</span>
                       </div>
                     </div>
