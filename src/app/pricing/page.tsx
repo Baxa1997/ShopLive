@@ -19,7 +19,7 @@ export default function PricingPage() {
             <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all">
                 <Zap className="w-5 h-5 text-emerald-600" />
             </div>
-            <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">LifeShop</span>
+            <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">ShopsReady</span>
           </Link>
       </header>
 

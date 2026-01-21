@@ -65,7 +65,7 @@ export default function ShopifyStats() {
             viewport={{ once: true }}
             className="text-lg text-slate-500 max-w-2xl mx-auto"
           >
-            LifeShop provides the intelligence and speed needed to scale your e-commerce operations instantly.
+            ShopsReady provides the intelligence and speed needed to scale your e-commerce operations instantly.
           </motion.p>
         </div>
 

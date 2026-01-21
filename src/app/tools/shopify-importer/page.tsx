@@ -278,7 +278,7 @@ Remove '$' symbols from prices.`;
           <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all">
             <Zap className="w-5 h-5 text-emerald-600" />
           </div>
-          <span className="font-heading font-bold text-lg text-slate-800 tracking-tight hidden md:block">LifeShop</span>
+          <span className="font-heading font-bold text-lg text-slate-800 tracking-tight hidden md:block">ShopsReady</span>
         </Link>
       </div>
 

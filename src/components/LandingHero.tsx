@@ -55,7 +55,7 @@ export default function LandingHero() {
                  <div className="bg-white/80 p-2 rounded-lg backdrop-blur-md border border-emerald-500/10 shadow-sm">
                     <Zap className="w-5 h-5 text-emerald-600" />
                 </div>
-                <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">LifeShop</span>
+                <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">ShopsReady</span>
             </div>
 
             {/* Navigation Items */}
@@ -86,9 +86,9 @@ export default function LandingHero() {
           transition={{ delay: 0.1, duration: 0.5 }}
           className="text-5xl md:text-7xl font-heading font-extrabold text-slate-900 tracking-tight mb-8 leading-[1.1]"
         >
-          Your Personal <br />
+          Ultimate AI <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600">
-            Shop Assistant
+            Shopify Importer
           </span>
         </motion.h1>
 
@@ -98,7 +98,7 @@ export default function LandingHero() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed font-body"
         >
-          Simplify your daily chaos. Choose a category below to access powerful, specialized AI tools designed for real life.
+          ShopsReady is the smartest way to import products to Shopify. Convert PDFs, images, and raw text into optimized Shopify CSV files in seconds.
         </motion.p>
       </div>
 

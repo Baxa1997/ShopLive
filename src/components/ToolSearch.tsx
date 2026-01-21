@@ -61,7 +61,7 @@ export default function ToolSearch() {
             <div className="bg-emerald-500/10 p-2 rounded-lg backdrop-blur-md border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-all">
                 <Zap className="w-5 h-5 text-emerald-400" />
             </div>
-            <span className="font-heading font-bold text-xl text-white tracking-tight">LifeShop</span>
+            <span className="font-heading font-bold text-xl text-white tracking-tight">ShopsReady</span>
           </Link>
         </div>
 

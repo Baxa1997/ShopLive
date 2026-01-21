@@ -17,8 +17,27 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "LifeShop | Premium Shop Assistant Dashboard",
-  description: "Advanced AI tools suite for productivity and business automation.",
+  title: "ShopsReady | Ultimate Shopify Product Importer & AI E-commerce Tools",
+  description: "Convert PDFs and images into Shopify-ready CSV files instantly. ShopsReady is the #1 tool for Shopify merchants to automate product listing and catalog management.",
+  keywords: ["Shopify product importer", "PDF to Shopify CSV", "AI e-commerce tools", "ShopsReady", "automated product listings"],
+  authors: [{ name: "ShopsReady Team" }],
+  metadataBase: new URL("https://shopsready.com"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "ShopsReady | AI-Powered Shopify Product Importer",
+    description: "The fastest way to import products to Shopify. Convert any document to CSV in seconds.",
+    url: "https://shopsready.com",
+    siteName: "ShopsReady",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ShopsReady | AI Shopify Tools",
+    description: "Transform your Shopify store with AI automation.",
+  }
 };
 
 export default function RootLayout({
