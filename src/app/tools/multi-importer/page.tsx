@@ -30,9 +30,13 @@ interface UnifiedProduct {
     published: string;
     variants: ShopifyVariant[];
   };
-  amazon_fields: {
-    category_suggestion: string;
-    bullet_points: string[];
+  amazon_technical_data: {
+    optimized_title: string;
+    power_bullets: string[];
+    backend_search_terms: string;
+    item_type_keyword: string;
+    target_audience: string;
+    ai_semantic_summary: string;
     inventory_loader_mapping: {
       item_type_keyword: string;
       standard_product_id_type: string;
@@ -153,14 +157,18 @@ export default function ShopifyImporterPage() {
                 },
                 required: ["handle", "title", "body_html", "vendor", "product_type", "tags", "published", "variants"]
               },
-              amazon_fields: {
+              amazon_technical_data: {
                 type: SchemaType.OBJECT,
                 properties: {
-                  category_suggestion: { type: SchemaType.STRING },
-                  bullet_points: {
+                  optimized_title: { type: SchemaType.STRING },
+                  power_bullets: {
                     type: SchemaType.ARRAY,
                     items: { type: SchemaType.STRING }
                   },
+                  backend_search_terms: { type: SchemaType.STRING },
+                  item_type_keyword: { type: SchemaType.STRING },
+                  target_audience: { type: SchemaType.STRING },
+                  ai_semantic_summary: { type: SchemaType.STRING },
                   inventory_loader_mapping: {
                     type: SchemaType.OBJECT,
                     properties: {
@@ -168,10 +176,11 @@ export default function ShopifyImporterPage() {
                       standard_product_id_type: { type: SchemaType.STRING }
                     }
                   }
-                }
+                },
+                required: ["optimized_title", "power_bullets", "backend_search_terms", "item_type_keyword", "target_audience", "ai_semantic_summary", "inventory_loader_mapping"]
               }
             },
-            required: ["internal_id", "shopify_fields", "amazon_fields"]
+            required: ["internal_id", "shopify_fields", "amazon_technical_data"]
           }
         };
 
@@ -185,22 +194,35 @@ export default function ShopifyImporterPage() {
 
         const imagePart = await fileToGenerativePart(uploadedFile);
 
-        const prompt = `Role: You are a senior E-commerce Data Engineer specializing in Shopify and Amazon marketplace logistics.
+        const prompt = `Role: You are a Senior Amazon Marketplace Strategist and Technical Data Engineer. Your goal is to convert raw product data into an "Elite Tier" Amazon FBA listing that is 100% compliant with Amazon's Style Guides and optimized for high-conversion mobile shopping.
 
-Task: Analyze the attached PDF product catalog. Extract all product data and structure it to be "Ready" for both Shopify and Amazon platforms.
+Task: Analyze the attached PDF/Image. Extract and structure data for Shopify/Amazon.
 
-Extraction Requirements:
-1. Unified Schema: Identify Title, Price, SKU, Weight, and all Variants (Size, Color, Material).
-2. Amazon Category Mapping: Based on the product type, predict the most accurate Amazon "Product Type" or "Category" (e.g., Home_Decoration or Pet_Supplies).
-3. Amazon Bullet Point Optimizer: Generate 5 high-converting bullet points following Amazon’s strict character limits (max 200 chars per bullet).
-   Logic: Bullet 1: Top Benefit; Bullet 2: Material/Quality; Bullet 3: Best Use Case; Bullet 4: Dimensions/Specs; Bullet 5: Warranty/Trust.
-4. Shopify Handle Logic: Create a clean, unique "Handle" for each product to ensure correct variant grouping in the CSV.
+Amazon Listing instructions:
+1. Title Architecture (Mobile-First):
+   Formula: [Brand] + [Core Keyword] + [Top Benefit] + [Key Material/Feature] + [Unit Count/Size/Color].
+   Ensure it is between 150-190 characters. Ensure most important keywords are in the first 80 characters.
 
-CRITICAL RULES:
-- Never leave Vendor, Type, or Tags empty.
-- HTML: The description must be valid HTML (use <p>, <ul>, <li>).
-- Shopify Defaults: Use 500 for grams and 'shopify' for variant_inventory_tracker if not specified.
-- Remove '$' symbols from prices.`;
+2. Power-Bullet Logic (5 Bullets):
+   Each bullet MUST start with a BOLDED CAPITALIZED HEADER followed by a colon.
+   Bullet 1 (Immediate Solution): What is the "Job to be Done"?
+   Bullet 2 (Technical Superiority): Durability, materials, and craftsmanship.
+   Bullet 3 (User Experience): Explain the "feel" or specific use case.
+   Bullet 4 (Safety & Compliance): Mention certifications (FDA, BPA-free), exact dimensions in inches, care instructions.
+   Bullet 5 (The Brand Promise): Call to action regarding quality and support.
+
+3. Technical Meta-Data:
+   item_type_keyword: Suggest accurate Amazon "Item Type Keyword" for Flat File.
+   backend_search_terms: 250 bytes. No brand names, no commas, no repetition.
+   target_audience: Explicitly state who this is for and where it should be used.
+
+4. SEO for "Rufus" (Amazon AI):
+   ai_semantic_summary: 3-sentence description for AI crawlers to help product surface in natural language queries.
+
+Shopify Requirements:
+- HTML descriptions (<p>, <ul>, <li>).
+- grams: 500 default.
+- handle: unique slugs.`;
 
         const result = await model.generateContent([prompt, imagePart]);
         const response = await result.response;
@@ -244,15 +266,19 @@ CRITICAL RULES:
                 }
               ]
             },
-            amazon_fields: {
-              category_suggestion: 'Outerwear',
-              bullet_points: [
-                'Premium quality denim for long-lasting durability.',
-                'Classic design that never goes out of style.',
-                'Perfect for casual outings and layering.',
-                'Available in multiple sizes for comfortable fit.',
-                'Buy with confidence with our satisfaction guarantee.'
+            amazon_technical_data: {
+              optimized_title: 'Urban Threads Classic Denim Jacket - Mobile Optimized Rugged Outerwear - Men\'s Medium Blue - Durable Cotton',
+              power_bullets: [
+                'IMMEDIATE SOLUTION: Provides instant warmth and a timeless rugged aesthetic for shifting seasons.',
+                'TECHNICAL SUPERIORITY: Reinforced with 14oz heavy-duty denim and double-stitched seams for maximum durability.',
+                'USER EXPERIENCE: Designed for a relaxed fit that feels broken-in from Day 1, ideal for layering.',
+                'SAFETY & COMPLIANCE: 100% Cotton; Lead-free buttons; Machine washable. Back length measures 28 inches.',
+                'THE BRAND PROMISE: We stand by our craftsmanship with a 5-year guarantee on all stitching and fabric.'
               ],
+              backend_search_terms: 'denim jacket blue outerwear men fashion rugged classic gift daily wear worker style',
+              item_type_keyword: 'jacket',
+              target_audience: 'Fashion-forward men looking for durable everyday outerwear.',
+              ai_semantic_summary: 'A classic denim jacket that balances style and durability. Ideal for men seeking a reliable piece for layering in spring or autumn. Made from pre-shrunk cotton for a perfect fit.',
               inventory_loader_mapping: {
                 item_type_keyword: 'jacket',
                 standard_product_id_type: 'UPC'
@@ -354,10 +380,13 @@ CRITICAL RULES:
     let amazonContent = "AMAZON PRODUCT LISTINGS\n=======================\n\n";
     products.forEach(p => {
       amazonContent += `Product: ${p.shopify_fields.title}\n`;
-      amazonContent += `Category: ${p.amazon_fields.category_suggestion}\n`;
-      amazonContent += `Keywords: ${p.amazon_fields.inventory_loader_mapping.item_type_keyword}\n\n`;
-      amazonContent += `Bullet Points:\n`;
-      p.amazon_fields.bullet_points.forEach((bp, i) => {
+      amazonContent += `Amazon Optimized Title: ${p.amazon_technical_data.optimized_title}\n`;
+      amazonContent += `Item Type Keyword: ${p.amazon_technical_data.item_type_keyword}\n`;
+      amazonContent += `Target Audience: ${p.amazon_technical_data.target_audience}\n`;
+      amazonContent += `Backend Search Terms: ${p.amazon_technical_data.backend_search_terms}\n`;
+      amazonContent += `AI Semantic Summary: ${p.amazon_technical_data.ai_semantic_summary}\n\n`;
+      amazonContent += `Power Bullets:\n`;
+      p.amazon_technical_data.power_bullets.forEach((bp, i) => {
         amazonContent += `${i+1}. ${bp}\n`;
       });
       amazonContent += "\n-----------------------\n\n";
@@ -642,22 +671,38 @@ CRITICAL RULES:
                       {/* Right: Marketplace Info */}
                       <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-200">
                         <div className="flex items-center justify-between border-b border-slate-300 pb-2">
-                          <span className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">Marketplace AI</span>
+                          <span className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">Elite FBA Strategy</span>
                           <button 
                             onClick={() => setActiveAmazonToolId(activeAmazonToolId === product.internal_id ? null : product.internal_id)}
-                            className="text-[9px] font-bold text-orange-600 hover:text-orange-700 underline"
+                            className="text-[9px] font-bold text-orange-600 hover:text-orange-700 underline flex items-center gap-1"
                           >
-                            {activeAmazonToolId === product.internal_id ? 'Hide Details' : 'View AI Bullet Points'}
+                            <Sparkles className="w-3 h-3" />
+                            {activeAmazonToolId === product.internal_id ? 'Hide Strategy' : 'View Full Optimization'}
                           </button>
                         </div>
                         <div className="space-y-2">
                           <div className="space-y-0.5">
-                            <span className="text-[8px] font-bold text-slate-500 uppercase">Amazon Category</span>
-                            <p className="text-xs font-bold text-slate-700 truncate">{product.amazon_fields.category_suggestion}</p>
+                            <span className="text-[8px] font-bold text-slate-500 uppercase">Item Type Keyword</span>
+                            <p className="text-xs font-bold text-slate-700 truncate">{product.amazon_technical_data.item_type_keyword}</p>
                           </div>
                           <div className="space-y-0.5">
-                            <span className="text-[8px] font-bold text-slate-500 uppercase">Search Keyword</span>
-                            <p className="text-xs font-mono text-slate-500 truncate">{product.amazon_fields.inventory_loader_mapping.item_type_keyword}</p>
+                            <span className="text-[8px] font-bold text-slate-500 uppercase">Target Audience</span>
+                            <p className="text-[10px] text-slate-600 line-clamp-1 italic">{product.amazon_technical_data.target_audience}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[8px] font-bold text-slate-500 uppercase">Mobile-First Title</span>
+                            <div className="group/copy relative">
+                                <p className="text-[10px] font-medium text-slate-800 line-clamp-2 bg-white p-2 rounded border border-slate-200 leading-tight">
+                                    {product.amazon_technical_data.optimized_title}
+                                </p>
+                                <button 
+                                    onClick={() => navigator.clipboard.writeText(product.amazon_technical_data.optimized_title)}
+                                    className="absolute right-1 top-1 p-1 bg-slate-100 rounded opacity-0 group-hover/copy:opacity-100 transition-opacity"
+                                    title="Copy Title"
+                                >
+                                    <Download className="w-3 h-3 text-slate-600" />
+                                </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -666,13 +711,67 @@ CRITICAL RULES:
                     {/* AI Preview Section */}
                     {activeAmazonToolId === product.internal_id && (
                       <div className="p-4 bg-slate-900 rounded-xl text-white animate-in slide-in-from-top-2 duration-300">
-                        <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-3">AI Suggested Bullet Points</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {product.amazon_fields.bullet_points.map((bp, i) => (
-                            <div key={i} className="text-[11px] text-slate-300 leading-relaxed border-l-2 border-emerald-500/30 pl-2">
-                              {bp}
+                        <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
+                            <div>
+                                <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">FBA Power Bullets</h4>
+                                <p className="text-[9px] text-slate-400 mt-1">Benefit-Driven • Mobile Optimized</p>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium text-right">
+                                <span className="block">HEADERS: BOLD & CAPS</span>
+                                <span className="block opacity-50 text-[8px]">Job to be Done • Technical • UX</span>
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 gap-3">
+                          {product.amazon_technical_data.power_bullets.map((bp, i) => (
+                            <div key={i} className="flex items-start gap-3 group/bp bg-white/5 p-3 rounded-lg border border-white/10 hover:border-emerald-500/50 transition-all">
+                              <div className="flex-1 text-[11px] text-slate-200 leading-relaxed">
+                                {bp.includes(':') ? (
+                                    <>
+                                        <span className="font-black text-white uppercase tracking-wider">{bp.split(':')[0]}:</span>
+                                        {bp.split(':').slice(1).join(':')}
+                                    </>
+                                ) : (
+                                    bp
+                                )}
+                              </div>
+                              <button 
+                                onClick={() => navigator.clipboard.writeText(bp)}
+                                className="p-1.5 bg-white/10 rounded-md hover:bg-emerald-500 transition-colors"
+                                title="Copy Bullet Point"
+                              >
+                                <Check className="w-3 h-3 text-white" />
+                              </button>
                             </div>
                           ))}
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="pt-4 border-t border-white/10">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Backend Search Terms (250 bytes)</span>
+                                    <button 
+                                        onClick={() => navigator.clipboard.writeText(product.amazon_technical_data.backend_search_terms)}
+                                        className="text-[9px] text-emerald-400 hover:underline"
+                                    >
+                                        Copy Keywords
+                                    </button>
+                                </div>
+                                <p className="text-[10px] font-mono text-slate-500 bg-black/30 p-2 rounded break-words min-h-[40px]">
+                                    {product.amazon_technical_data.backend_search_terms}
+                                </p>
+                            </div>
+                            <div className="pt-4 border-t border-white/10">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[8px] font-bold text-cyan-400 uppercase tracking-widest">Rufus SEO (AI Crawler Context)</span>
+                                        <Sparkles className="w-2.5 h-2.5 text-cyan-400" />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-400 leading-relaxed italic">
+                                    {product.amazon_technical_data.ai_semantic_summary}
+                                </p>
+                            </div>
                         </div>
                       </div>
                     )}
