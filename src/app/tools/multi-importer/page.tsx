@@ -9,49 +9,45 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
 
-interface ShopifyVariant {
+interface MasterArchitectVariant {
+  sku: string;
+  price: string;
   option1_name: string;
   option1_value: string;
-  variant_sku: string;
-  variant_grams: number;
-  variant_price: string;
-  variant_inventory_qty: number;
-  variant_inventory_tracker: string;
+  grams: number;
+  inventory_qty: number;
 }
 
 interface UnifiedProduct {
   sync_id: string;
-  shopify_data: {
+  shopify_service: {
     handle: string;
     title: string;
-    body_html: string;
+    html_description: string;
+    tags: string;
     vendor: string;
     product_type: string;
-    tags: string;
-    published: string;
-    variants: ShopifyVariant[];
+    variants: MasterArchitectVariant[];
   };
-  amazon_fba_data: {
-    flat_file_mapping: {
+  amazon_fba_service: {
+    flat_file_data: {
       item_name: string;
       item_type_keyword: string;
-      external_product_id_type: string;
-      standard_price: string;
-      brand_name: string;
       feed_product_type: string;
+      brand_name: string;
+      standard_price: string;
+      bullets: string[];
     };
-    power_bullets: string[];
-    backend_search_terms: string;
-    rufus_semantic_context: string;
+    search_terms: string;
+    rufus_summary: string;
   };
-  aplus_content: {
-    module_1_header: string;
-    module_1_body: string;
-    module_2_header: string;
-    module_2_body: string;
-    module_3_header: string;
-    module_3_body: string;
+  aplus_content_service: {
+    modules: { header: string; body: string }[];
     image_alt_text: string;
+  };
+  readiness_report: {
+    status: string;
+    missing_fields: string[];
   };
 }
 
@@ -140,71 +136,82 @@ export default function ShopifyImporterPage() {
             type: SchemaType.OBJECT,
             properties: {
               sync_id: { type: SchemaType.STRING },
-              shopify_data: {
+              shopify_service: {
                 type: SchemaType.OBJECT,
                 properties: {
                   handle: { type: SchemaType.STRING },
                   title: { type: SchemaType.STRING },
-                  body_html: { type: SchemaType.STRING },
+                  html_description: { type: SchemaType.STRING },
+                  tags: { type: SchemaType.STRING },
                   vendor: { type: SchemaType.STRING },
                   product_type: { type: SchemaType.STRING },
-                  tags: { type: SchemaType.STRING },
-                  published: { type: SchemaType.STRING },
                   variants: {
                     type: SchemaType.ARRAY,
                     items: {
                       type: SchemaType.OBJECT,
                       properties: {
+                        sku: { type: SchemaType.STRING },
+                        price: { type: SchemaType.STRING },
                         option1_name: { type: SchemaType.STRING },
                         option1_value: { type: SchemaType.STRING },
-                        variant_sku: { type: SchemaType.STRING },
-                        variant_grams: { type: SchemaType.NUMBER },
-                        variant_price: { type: SchemaType.STRING },
-                        variant_inventory_qty: { type: SchemaType.NUMBER },
-                        variant_inventory_tracker: { type: SchemaType.STRING },
+                        grams: { type: SchemaType.NUMBER },
+                        inventory_qty: { type: SchemaType.NUMBER },
                       }
                     }
                   }
                 },
-                required: ["handle", "title", "body_html", "vendor", "product_type", "tags", "published", "variants"]
+                required: ["handle", "title", "html_description", "tags", "vendor", "product_type", "variants"]
               },
-              amazon_fba_data: {
+              amazon_fba_service: {
                 type: SchemaType.OBJECT,
                 properties: {
-                  flat_file_mapping: {
+                  flat_file_data: {
                     type: SchemaType.OBJECT,
                     properties: {
                       item_name: { type: SchemaType.STRING },
                       item_type_keyword: { type: SchemaType.STRING },
-                      external_product_id_type: { type: SchemaType.STRING },
-                      standard_price: { type: SchemaType.STRING },
+                      feed_product_type: { type: SchemaType.STRING },
                       brand_name: { type: SchemaType.STRING },
-                      feed_product_type: { type: SchemaType.STRING }
+                      standard_price: { type: SchemaType.STRING },
+                      bullets: {
+                        type: SchemaType.ARRAY,
+                        items: { type: SchemaType.STRING }
+                      }
                     }
                   },
-                  power_bullets: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING }
-                  },
-                  backend_search_terms: { type: SchemaType.STRING },
-                  rufus_semantic_context: { type: SchemaType.STRING }
+                  search_terms: { type: SchemaType.STRING },
+                  rufus_summary: { type: SchemaType.STRING }
                 },
-                required: ["flat_file_mapping", "power_bullets", "backend_search_terms", "rufus_semantic_context"]
+                required: ["flat_file_data", "search_terms", "rufus_summary"]
               },
-              aplus_content: {
+              aplus_content_service: {
                 type: SchemaType.OBJECT,
                 properties: {
-                  module_1_header: { type: SchemaType.STRING },
-                  module_1_body: { type: SchemaType.STRING },
-                  module_2_header: { type: SchemaType.STRING },
-                  module_2_body: { type: SchemaType.STRING },
-                  module_3_header: { type: SchemaType.STRING },
-                  module_3_body: { type: SchemaType.STRING },
+                  modules: {
+                    type: SchemaType.ARRAY,
+                    items: {
+                      type: SchemaType.OBJECT,
+                      properties: {
+                        header: { type: SchemaType.STRING },
+                        body: { type: SchemaType.STRING }
+                      }
+                    }
+                  },
                   image_alt_text: { type: SchemaType.STRING }
+                }
+              },
+              readiness_report: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  status: { type: SchemaType.STRING },
+                  missing_fields: {
+                    type: SchemaType.ARRAY,
+                    items: { type: SchemaType.STRING }
+                  }
                 }
               }
             },
-            required: ["sync_id", "shopify_data", "amazon_fba_data", "aplus_content"]
+            required: ["sync_id", "shopify_service", "amazon_fba_service", "aplus_content_service", "readiness_report"]
           }
         };
 
@@ -218,21 +225,33 @@ export default function ShopifyImporterPage() {
 
         const imagePart = await fileToGenerativePart(uploadedFile);
 
-        const prompt = `Role: You are the "ShopsReady" Multi-Channel Data Architect. Your mission is to ingest raw supplier data and output a perfectly synchronized JSON object that powers a Shopify CSV and an Amazon Pro-FBA Flat File.
+        const prompt = `Role: You are the "ShopsReady" Master Architect. Your task is to extract product data and transform it into a 100% compliant, synchronized data structure for 5 distinct seller services.
 
-Core Directives:
-1. Technical Mapping: Identify exact Amazon feed_product_type and item_type_keyword.
-2. SEO Dominance: Generate a "Mobile-First" title (150-190 chars, critical keywords in first 80).
-3. Power Bullets: 5 bullets starting with BOLDED CAPS BENEFITS.
-   Bullet 1: Problem/Solution; Bullet 2: Quality/Build; Bullet 3: Versatility; Bullet 4: Tech Specs; Bullet 5: Trust/Guarantee.
-4. AI Search (Rufus) Optimization: Include a 3-sentence conversational summary answering buyer questions.
-5. SKU Sync: Ensure sync_id is the primary variant SKU for both platforms.
-6. A+ Content Strategy: Breakdown technical specs into 3 storytelling modules (header/body) for A+ Content.
+The 5 Logic Layers to Implement:
 
-Shopify Requirements:
-- HTML formatted description.
-- grams: 500 default.
-- handle: slugified title.`;
+Service 1: Technical Amazon Flat File (Operational)
+- Map data to exact Amazon headers.
+- item_name: SEO-optimized (150-180 chars, keywords in first 80).
+- bullets: 5 distinct benefits starting with BOLD CAPS.
+- Generate a unique sync_id / seller_sku (Formula: [Brand]-[Model]-[First Letter of Color/Size]).
+
+Service 2: Shopify Multi-Channel Sync (Marketing)
+- Create a CSV-ready object with HTML <strong> and <li> tags.
+- Logic: Variant SKUs must EXTACLY match the sync_id for inventory synchronization.
+
+Service 3: A+ Content Storytelling (Enhanced Branding)
+- Generate 3 modules:
+  Module 1 (The Craft): Materials and origins.
+  Module 2 (The Experience): User benefits.
+  Module 3 (The Trust): Quality guarantee.
+- SEO "Alt-text" for primary product images.
+
+Service 4: AI-Search (Rufus) Optimization (Modern SEO)
+- Write a 100-word Semantic Summary in natural, conversational language answering common customer questions.
+
+Service 5: Technical Readiness Audit (Validation)
+- Identify missing data (e.g., UPC barcodes).
+- Provide a 250-byte backend search term string (no commas, no repetitions).`;
 
         const result = await model.generateContent([prompt, imagePart]);
         const response = await result.response;
@@ -255,54 +274,54 @@ Shopify Requirements:
         await new Promise(resolve => setTimeout(resolve, 2000));
         const mockProducts: UnifiedProduct[] = [
           {
-            sync_id: 'URB-DENIM-001',
-            shopify_data: {
-              handle: 'urban-rugged-denim-jacket',
-              title: 'Urban Threads Rugged Denim Jacket',
-              body_html: '<h1>The Ultimate Rugged Denim Jacket</h1><p>Designed for durability and style.</p>',
+            sync_id: 'URB-DENIM-NAVY-M',
+            shopify_service: {
+              handle: 'urban-rugged-denim-jacket-navy',
+              title: 'Urban Threads Rugged Denim Jacket - Navy',
+              html_description: '<strong>The Ultimate Rugged Denim Jacket</strong><ul><li>Reinforced 14oz Denim</li><li>Double-stitched seams</li><li>Eco-friendly dyes</li></ul>',
+              tags: 'denim, jacket, men fashion, rugged',
               vendor: 'Urban Threads',
               product_type: 'Outerwear',
-              tags: 'denim, jacket, men fashion, rugged',
-              published: 'TRUE',
               variants: [
                 {
-                  option1_name: 'Color',
-                  option1_value: 'Deep Indigo',
-                  variant_sku: 'URB-DENIM-001',
-                  variant_grams: 850,
-                  variant_price: '129.99',
-                  variant_inventory_qty: 150,
-                  variant_inventory_tracker: 'shopify'
+                  sku: 'URB-DENIM-NAVY-M',
+                  price: '129.99',
+                  option1_name: 'Size',
+                  option1_value: 'Medium',
+                  grams: 850,
+                  inventory_qty: 150
                 }
               ]
             },
-            amazon_fba_data: {
-              flat_file_mapping: {
-                item_name: 'Urban Threads Classic Denim Jacket - Mobile Optimized Rugged Outerwear - Men\'s Medium Blue - Durable Cotton',
+            amazon_fba_service: {
+              flat_file_data: {
+                item_name: 'Urban Threads Classic Denim Jacket - Mobile Optimized Rugged Outerwear - Men\'s Medium Navy - 100% Durable Cotton',
                 item_type_keyword: 'jackets',
-                external_product_id_type: 'UPC',
-                standard_price: '129.99',
+                feed_product_type: 'outerwear',
                 brand_name: 'Urban Threads',
-                feed_product_type: 'outerwear'
+                standard_price: '129.99',
+                bullets: [
+                  'IMMEDIATE SOLUTION: Provides instant warmth and a timeless rugged aesthetic for shifting seasons.',
+                  'TECHNICAL SUPERIORITY: Reinforced with 14oz heavy-duty denim and double-stitched seams for maximum durability.',
+                  'USER EXPERIENCE: Designed for a relaxed fit that feels broken-in from Day 1, ideal for layering.',
+                  'SPECIFICATIONS: 100% Cotton construction; Lead-free buttons; Machine washable. Back length measures 28 inches.',
+                  'TRUST: We stand by our craftsmanship with a 5-year guarantee on all stitching and fabric.'
+                ]
               },
-              power_bullets: [
-                'IMMEDIATE SOLUTION: Provides instant warmth and a timeless rugged aesthetic for shifting seasons.',
-                'TECHNICAL SUPERIORITY: Reinforced with 14oz heavy-duty denim and double-stitched seams for maximum durability.',
-                'USER EXPERIENCE: Designed for a relaxed fit that feels broken-in from Day 1, ideal for layering.',
-                'SPECIFICATIONS: 100% Cotton construction; Lead-free buttons; Machine washable. Back length measures 28 inches.',
-                'TRUST: We stand by our craftsmanship with a 5-year guarantee on all stitching and fabric.'
-              ],
-              backend_search_terms: 'denim jacket blue outerwear men fashion rugged classic gift daily wear worker style',
-              rufus_semantic_context: 'This Urban Threads denim jacket is the ideal blend of durability and comfort for craftsmen and urban explorers. It features reinforced denim perfect for spring or autumn layering.'
+              search_terms: 'denim jacket blue outerwear men fashion rugged classic gift daily wear worker style',
+              rufus_summary: 'This Urban Threads denim jacket is the ideal blend of durability and comfort for craftsmen and urban explorers. It features reinforced denim perfect for spring or autumn layering, answering the need for a long-lasting, stylish outer layer.'
             },
-            aplus_content: {
-              module_1_header: 'Engineered for the Elements',
-              module_1_body: 'Our denim is woven with a high-density technique that resists abrasions and wins against the wind.',
-              module_2_header: 'Artisanal Craftsmanship',
-              module_2_body: 'Every seam is double-locked to ensure that your jacket lasts a lifetime, not just a season.',
-              module_3_header: 'The Perfect Fit',
-              module_3_body: 'A tailored yet comfortable silhouette designed for the modern man on the move.',
-              image_alt_text: 'Model wearing a deep indigo denim jacket in an urban industrial environment'
+            aplus_content_service: {
+              modules: [
+                { header: 'Engineered for the Elements', body: 'Our denim is woven with a high-density technique that resists abrasions.' },
+                { header: 'Artisanal Craftsmanship', body: 'Every seam is double-locked to ensure durability across a lifetime.' },
+                { header: 'The Urban Threads Promise', body: 'We guarantee the quality of every stitch for five years.' }
+              ],
+              image_alt_text: 'Model wearing a navy denim jacket in an urban environment'
+            },
+            readiness_report: {
+              status: '90% Ready',
+              missing_fields: ['UPC/EAN Barcode']
             }
           }
         ];
@@ -327,17 +346,17 @@ Shopify Requirements:
   const handleShopifyChange = (pIdx: number, field: string, value: string) => {
     const updated = [...products];
     const product = updated[pIdx];
-    (product.shopify_data as any)[field] = value;
+    (product.shopify_service as any)[field] = value;
     setProducts(updated);
   };
 
-  const handleVariantChange = (pIdx: number, vIdx: number, field: keyof ShopifyVariant, value: string) => {
+  const handleVariantChange = (pIdx: number, vIdx: number, field: keyof MasterArchitectVariant, value: string | number) => {
     const updated = [...products];
-    const variant = updated[pIdx].shopify_data.variants[vIdx];
-    if (field === 'variant_grams' || field === 'variant_inventory_qty') {
+    const variant = updated[pIdx].shopify_service.variants[vIdx];
+    if (field === 'grams' || field === 'inventory_qty') {
       (variant[field] as number) = Number(value);
     } else {
-      (variant[field] as string) = value;
+      (variant[field] as string) = value as string;
     }
     setProducts(updated);
   };
@@ -351,22 +370,22 @@ Shopify Requirements:
     
     const rows: any[] = [];
     products.forEach(p => {
-      p.shopify_data.variants.forEach(v => {
+      p.shopify_service.variants.forEach(v => {
         rows.push([
-          p.shopify_data.handle,
-          p.shopify_data.title,
-          p.shopify_data.body_html,
-          p.shopify_data.vendor,
-          p.shopify_data.product_type,
-          p.shopify_data.tags,
-          p.shopify_data.published,
+          p.shopify_service.handle,
+          p.shopify_service.title,
+          p.shopify_service.html_description,
+          p.shopify_service.vendor,
+          p.shopify_service.product_type,
+          p.shopify_service.tags,
+          'TRUE', // published
           v.option1_name,
           v.option1_value,
-          v.variant_price,
-          v.variant_grams,
-          v.variant_inventory_tracker,
-          v.variant_inventory_qty,
-          v.variant_sku,
+          v.price,
+          v.grams,
+          'shopify', // inventory tracker
+          v.inventory_qty,
+          v.sku,
           '' // image_src placeholder
         ]);
       });
@@ -414,20 +433,20 @@ Shopify Requirements:
 
     products.forEach(p => {
       worksheet.addRow({
-        item_name: p.amazon_fba_data.flat_file_mapping.item_name,
-        brand_name: p.amazon_fba_data.flat_file_mapping.brand_name,
+        item_name: p.amazon_fba_service.flat_file_data.item_name,
+        brand_name: p.amazon_fba_service.flat_file_data.brand_name,
         external_product_id: '', // To be filled by user
-        external_product_id_type: p.amazon_fba_data.flat_file_mapping.external_product_id_type,
-        standard_price: p.amazon_fba_data.flat_file_mapping.standard_price,
-        item_type_keyword: p.amazon_fba_data.flat_file_mapping.item_type_keyword,
-        feed_product_type: p.amazon_fba_data.flat_file_mapping.feed_product_type,
+        external_product_id_type: 'UPC',
+        standard_price: p.amazon_fba_service.flat_file_data.standard_price,
+        item_type_keyword: p.amazon_fba_service.flat_file_data.item_type_keyword,
+        feed_product_type: p.amazon_fba_service.flat_file_data.feed_product_type,
         seller_sku: p.sync_id,
-        bullet_point1: p.amazon_fba_data.power_bullets[0] || '',
-        bullet_point2: p.amazon_fba_data.power_bullets[1] || '',
-        bullet_point3: p.amazon_fba_data.power_bullets[2] || '',
-        bullet_point4: p.amazon_fba_data.power_bullets[3] || '',
-        bullet_point5: p.amazon_fba_data.power_bullets[4] || '',
-        generic_keywords: p.amazon_fba_data.backend_search_terms
+        bullet_point1: p.amazon_fba_service.flat_file_data.bullets[0] || '',
+        bullet_point2: p.amazon_fba_service.flat_file_data.bullets[1] || '',
+        bullet_point3: p.amazon_fba_service.flat_file_data.bullets[2] || '',
+        bullet_point4: p.amazon_fba_service.flat_file_data.bullets[3] || '',
+        bullet_point5: p.amazon_fba_service.flat_file_data.bullets[4] || '',
+        generic_keywords: p.amazon_fba_service.search_terms
       });
     });
 
@@ -443,21 +462,24 @@ Shopify Requirements:
     // 2. Amazon Listings (Text format)
     let amazonContent = "SHOPSREADY ARCHITECT - AMAZON FBA SYNC\n======================================\n\n";
     products.forEach(p => {
-      amazonContent += `Product: ${p.shopify_data.title}\n`;
+      amazonContent += `Product: ${p.shopify_service.title}\n`;
       amazonContent += `Sync ID (SKU): ${p.sync_id}\n`;
-      amazonContent += `Amazon Optimized Title: ${p.amazon_fba_data.flat_file_mapping.item_name}\n`;
-      amazonContent += `Feed Product Type: ${p.amazon_fba_data.flat_file_mapping.feed_product_type}\n`;
-      amazonContent += `Item Type Keyword: ${p.amazon_fba_data.flat_file_mapping.item_type_keyword}\n`;
-      amazonContent += `Backend Search Terms: ${p.amazon_fba_data.backend_search_terms}\n`;
-      amazonContent += `Rufus AI Semantic Context: ${p.amazon_fba_data.rufus_semantic_context}\n\n`;
+      amazonContent += `Amazon Optimized Title: ${p.amazon_fba_service.flat_file_data.item_name}\n`;
+      amazonContent += `Feed Product Type: ${p.amazon_fba_service.flat_file_data.feed_product_type}\n`;
+      amazonContent += `Item Type Keyword: ${p.amazon_fba_service.flat_file_data.item_type_keyword}\n`;
+      amazonContent += `Backend Search Terms: ${p.amazon_fba_service.search_terms}\n`;
+      amazonContent += `Rufus AI Semantic Context: ${p.amazon_fba_service.rufus_summary}\n\n`;
       amazonContent += `Power Bullets:\n`;
-      p.amazon_fba_data.power_bullets.forEach((bp, i) => {
+      p.amazon_fba_service.flat_file_data.bullets.forEach((bp, i) => {
         amazonContent += `${i+1}. ${bp}\n`;
       });
       amazonContent += `\nA+ CONTENT STRATEGY:\n`;
-      amazonContent += `Module 1: ${p.aplus_content.module_1_header} - ${p.aplus_content.module_1_body}\n`;
-      amazonContent += `Module 2: ${p.aplus_content.module_2_header} - ${p.aplus_content.module_2_body}\n`;
-      amazonContent += `Module 3: ${p.aplus_content.module_3_header} - ${p.aplus_content.module_3_body}\n`;
+      p.aplus_content_service.modules.forEach((mod, i) => {
+        amazonContent += `Module ${i+1}: ${mod.header} - ${mod.body}\n`;
+      });
+      amazonContent += `\nREADINESS REPORT:\n`;
+      amazonContent += `Status: ${p.readiness_report.status}\n`;
+      amazonContent += `Missing Data: ${p.readiness_report.missing_fields.join(', ')}\n`;
       amazonContent += "\n-----------------------\n\n";
     });
     zip.file('amazon_listings.txt', amazonContent);
@@ -655,7 +677,7 @@ Shopify Requirements:
               <div className="text-center md:text-left">
                 <h2 className="text-lg md:text-xl font-bold text-slate-900 leading-none mb-1">Review Your Products</h2>
                 <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
-                  <span className="text-green-600 font-black">{products.length} Products</span> • {products.reduce((acc, p) => acc + p.shopify_data.variants.length, 0)} Variants Detected
+                  <span className="text-green-600 font-black">{products.length} Products</span> • {products.reduce((acc, p) => acc + p.shopify_service.variants.length, 0)} Global Variants Synchronized
                 </p>
               </div>
               <div className="flex gap-3 w-full md:w-auto">
@@ -690,8 +712,10 @@ Shopify Requirements:
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <div className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold rounded-full border border-blue-100 uppercase tracking-tight">FBA Ready</div>
-                        <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-bold rounded-full border border-emerald-100 uppercase tracking-tight">Shopify Ready</div>
+                        <div className={`px-2 py-0.5 ${product.readiness_report.status.includes('100') ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'} text-[9px] font-bold rounded-full border uppercase tracking-tight`}>
+                            Architect Audit: {product.readiness_report.status}
+                        </div>
+                        <div className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold rounded-full border border-blue-100 uppercase tracking-tight">Sync Active</div>
                       </div>
                     </div>
 
@@ -703,7 +727,7 @@ Shopify Requirements:
                             <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Title</label>
                             <input
                               type="text"
-                              value={product.shopify_data.title}
+                              value={product.shopify_service.title}
                               onChange={(e) => handleShopifyChange(pIdx, 'title', e.target.value)}
                               className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-slate-900 outline-none transition-all"
                             />
@@ -712,7 +736,7 @@ Shopify Requirements:
                             <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Brand / Vendor</label>
                             <input
                               type="text"
-                              value={product.shopify_data.vendor}
+                              value={product.shopify_service.vendor}
                               onChange={(e) => handleShopifyChange(pIdx, 'vendor', e.target.value)}
                               className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-slate-700 outline-none transition-all"
                             />
@@ -724,7 +748,7 @@ Shopify Requirements:
                             <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Shopify Handle</label>
                             <input
                               type="text"
-                              value={product.shopify_data.handle}
+                              value={product.shopify_service.handle}
                               onChange={(e) => handleShopifyChange(pIdx, 'handle', e.target.value)}
                               className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-400 text-xs font-mono text-slate-600 outline-none"
                             />
@@ -733,7 +757,7 @@ Shopify Requirements:
                             <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Category / Type</label>
                             <input
                               type="text"
-                              value={product.shopify_data.product_type}
+                              value={product.shopify_service.product_type}
                               onChange={(e) => handleShopifyChange(pIdx, 'product_type', e.target.value)}
                               className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 text-sm font-semibold text-slate-700 outline-none"
                             />
@@ -755,25 +779,25 @@ Shopify Requirements:
                         </div>
                         <div className="space-y-2">
                           <div className="space-y-0.5">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">Item Type Keyword</span>
-                            <p className="text-xs font-bold text-slate-700 truncate">{product.amazon_fba_data.flat_file_mapping.item_type_keyword}</p>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase">FBA Item Type Keyword</span>
+                            <p className="text-xs font-bold text-slate-700 truncate">{product.amazon_fba_service.flat_file_data.item_type_keyword}</p>
                           </div>
                           <div className="space-y-0.5">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">Feed Product Type</span>
-                            <p className="text-[10px] text-slate-600 font-mono">{product.amazon_fba_data.flat_file_mapping.feed_product_type}</p>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase">FBA Feed Product Type</span>
+                            <p className="text-[10px] text-slate-600 font-mono">{product.amazon_fba_service.flat_file_data.feed_product_type}</p>
                           </div>
                           <div className="space-y-1">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">Mobile-First Title</span>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest text-emerald-600">Architect Optimized Title</span>
                             <div className="group/copy relative">
-                                <p className="text-[10px] font-medium text-slate-800 line-clamp-2 bg-white p-2 rounded border border-slate-200 leading-tight">
-                                    {product.amazon_fba_data.flat_file_mapping.item_name}
+                                <p className="text-[10px] font-medium text-slate-800 line-clamp-2 bg-white p-2 rounded border border-emerald-500/20 leading-tight">
+                                    {product.amazon_fba_service.flat_file_data.item_name}
                                 </p>
                                 <button 
-                                    onClick={() => navigator.clipboard.writeText(product.amazon_fba_data.flat_file_mapping.item_name)}
-                                    className="absolute right-1 top-1 p-1 bg-slate-100 rounded opacity-0 group-hover/copy:opacity-100 transition-opacity"
+                                    onClick={() => navigator.clipboard.writeText(product.amazon_fba_service.flat_file_data.item_name)}
+                                    className="absolute right-1 top-1 p-1 bg-emerald-50 rounded opacity-0 group-hover/copy:opacity-100 transition-opacity"
                                     title="Copy Title"
                                 >
-                                    <Download className="w-3 h-3 text-slate-600" />
+                                    <Download className="w-3 h-3 text-emerald-600" />
                                 </button>
                             </div>
                           </div>
@@ -786,19 +810,19 @@ Shopify Requirements:
                       <div className="p-4 bg-slate-900 rounded-xl text-white animate-in slide-in-from-top-2 duration-300">
                         <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
                             <div>
-                                <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">FBA Architect View</h4>
-                                <p className="text-[9px] text-slate-400 mt-1">Benefit-Driven • Mobile Optimized • Rufus AI Ready</p>
+                                <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Master Architect Strategy</h4>
+                                <p className="text-[9px] text-slate-400 mt-1">Operational • Marketing • Branding • SEO • Validation</p>
                             </div>
                             <div className="text-[10px] text-slate-400 font-medium text-right">
-                                <span className="block italic text-orange-400">Sync Global SKU: {product.sync_id}</span>
+                                <span className="block italic text-orange-400">Sync Master SKU: {product.sync_id}</span>
                             </div>
                         </div>
                         
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                             <div className="space-y-4">
-                                <h5 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">A9 Algorithm Power Bullets</h5>
+                                <h5 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">High-Conversion Power Bullets</h5>
                                 <div className="grid grid-cols-1 gap-2">
-                                {product.amazon_fba_data.power_bullets.map((bp, i) => (
+                                {product.amazon_fba_service.flat_file_data.bullets.map((bp, i) => (
                                     <div key={i} className="flex items-start gap-3 group/bp bg-white/5 p-3 rounded-lg border border-white/10 hover:border-emerald-500/50 transition-all">
                                     <div className="flex-1 text-[11px] text-slate-200 leading-relaxed">
                                         {bp.includes(':') ? (
@@ -824,43 +848,55 @@ Shopify Requirements:
                                 <div className="pt-4 border-t border-white/10">
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[8px] font-bold text-cyan-400 uppercase tracking-widest">Rufus AI Semantic Context</span>
+                                            <span className="text-[8px] font-bold text-cyan-400 uppercase tracking-widest">Rufus Semantic Summary (SEO Layer 4)</span>
                                             <Sparkles className="w-2.5 h-2.5 text-cyan-400" />
                                         </div>
                                     </div>
-                                    <p className="text-[11px] text-slate-300 leading-relaxed italic bg-black/20 p-3 rounded-lg border border-white/5">
-                                        "{product.amazon_fba_data.rufus_semantic_context}"
+                                    <p className="text-[11px] text-slate-300 leading-relaxed bg-black/20 p-3 rounded-lg border border-white/5">
+                                        "{product.amazon_fba_service.rufus_summary}"
                                     </p>
                                 </div>
                             </div>
 
                             <div className="space-y-4">
-                                <h5 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">A+ Content Storytelling Modules</h5>
+                                <h5 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">A+ Storytelling & Readiness (Layer 3 & 5)</h5>
                                 <div className="grid grid-cols-1 gap-3">
-                                    {[1, 2, 3].map((num) => (
-                                        <div key={num} className="bg-white/5 p-3 rounded-lg border border-white/10">
-                                            <span className="text-[8px] font-bold text-orange-400 uppercase mb-1 block">Module {num}: {(product.aplus_content as any)[`module_${num}_header`]}</span>
-                                            <p className="text-[10px] text-slate-400 leading-tight">{(product.aplus_content as any)[`module_${num}_body`]}</p>
+                                    {product.aplus_content_service.modules.map((mod, i) => (
+                                        <div key={i} className="bg-white/5 p-3 rounded-lg border border-white/10">
+                                            <span className="text-[8px] font-bold text-orange-400 uppercase mb-1 block">Module {i+1}: {mod.header}</span>
+                                            <p className="text-[10px] text-slate-400 leading-tight">{mod.body}</p>
                                         </div>
                                     ))}
+                                    
                                     <div className="bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/20">
                                         <span className="text-[8px] font-bold text-emerald-400 uppercase mb-1 block">SEO Image Alt Text</span>
-                                        <p className="text-[10px] text-slate-300 italic">{product.aplus_content.image_alt_text}</p>
+                                        <p className="text-[10px] text-slate-300 italic">{product.aplus_content_service.image_alt_text}</p>
+                                    </div>
+                                    
+                                    <div className="p-3 bg-red-500/5 rounded-lg border border-red-500/20">
+                                        <span className="text-[8px] font-bold text-red-400 uppercase mb-1 block">Readiness Audit - Missing Fields</span>
+                                        <div className="flex flex-wrap gap-2">
+                                            {product.readiness_report.missing_fields.map((field, i) => (
+                                                <span key={i} className="text-[9px] px-2 py-0.5 bg-red-500/10 text-red-300 rounded-full border border-red-500/20 font-bold">
+                                                    {field}
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div className="pt-4 border-t border-white/10">
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">FBA Backend Keywords</span>
+                                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">FBA Master Search Terms</span>
                                         <button 
-                                            onClick={() => navigator.clipboard.writeText(product.amazon_fba_data.backend_search_terms)}
+                                            onClick={() => navigator.clipboard.writeText(product.amazon_fba_service.search_terms)}
                                             className="text-[9px] text-emerald-400 hover:underline"
                                         >
                                             Copy All
                                         </button>
                                     </div>
                                     <p className="text-[10px] font-mono text-slate-500 bg-black/30 p-2 rounded break-words">
-                                        {product.amazon_fba_data.backend_search_terms}
+                                        {product.amazon_fba_service.search_terms}
                                     </p>
                                 </div>
                             </div>
@@ -882,7 +918,7 @@ Shopify Requirements:
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200">
-                            {product.shopify_data.variants.map((v, vIdx) => (
+                            {product.shopify_service.variants.map((v, vIdx) => (
                               <tr key={vIdx} className="hover:bg-slate-50 transition-colors">
                                 <td className="p-2">
                                   <input
@@ -897,8 +933,8 @@ Shopify Requirements:
                                     <span className="text-slate-400 mr-0.5">$</span>
                                     <input
                                       type="text"
-                                      value={v.variant_price}
-                                      onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_price', e.target.value)}
+                                      value={v.price}
+                                      onChange={(e) => handleVariantChange(pIdx, vIdx, 'price', e.target.value)}
                                       className="w-12 bg-transparent font-bold text-slate-700 outline-none text-center"
                                     />
                                   </div>
@@ -906,16 +942,16 @@ Shopify Requirements:
                                 <td className="p-2 border-r border-slate-200">
                                   <input
                                     type="text"
-                                    value={v.variant_sku}
-                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_sku', e.target.value)}
+                                    value={v.sku}
+                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'sku', e.target.value)}
                                     className="w-full bg-transparent font-mono text-[10px] text-emerald-600 font-bold outline-none"
                                   />
                                 </td>
                                 <td className="p-2 w-20 text-center">
                                   <input
                                     type="number"
-                                    value={v.variant_inventory_qty}
-                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_inventory_qty', e.target.value)}
+                                    value={v.inventory_qty}
+                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'inventory_qty', e.target.value)}
                                     className="w-full bg-transparent font-bold text-emerald-600 outline-none text-center"
                                   />
                                 </td>
