@@ -7,6 +7,7 @@ import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import ExcelJS from 'exceljs';
 
 interface ShopifyVariant {
   option1_name: string;
@@ -19,8 +20,8 @@ interface ShopifyVariant {
 }
 
 interface UnifiedProduct {
-  internal_id: string;
-  shopify_fields: {
+  sync_id: string;
+  shopify_data: {
     handle: string;
     title: string;
     body_html: string;
@@ -30,17 +31,27 @@ interface UnifiedProduct {
     published: string;
     variants: ShopifyVariant[];
   };
-  amazon_technical_data: {
-    optimized_title: string;
+  amazon_fba_data: {
+    flat_file_mapping: {
+      item_name: string;
+      item_type_keyword: string;
+      external_product_id_type: string;
+      standard_price: string;
+      brand_name: string;
+      feed_product_type: string;
+    };
     power_bullets: string[];
     backend_search_terms: string;
-    item_type_keyword: string;
-    target_audience: string;
-    ai_semantic_summary: string;
-    inventory_loader_mapping: {
-      item_type_keyword: string;
-      standard_product_id_type: string;
-    };
+    rufus_semantic_context: string;
+  };
+  aplus_content: {
+    module_1_header: string;
+    module_1_body: string;
+    module_2_header: string;
+    module_2_body: string;
+    module_3_header: string;
+    module_3_body: string;
+    image_alt_text: string;
   };
 }
 
@@ -128,8 +139,8 @@ export default function ShopifyImporterPage() {
           items: {
             type: SchemaType.OBJECT,
             properties: {
-              internal_id: { type: SchemaType.STRING },
-              shopify_fields: {
+              sync_id: { type: SchemaType.STRING },
+              shopify_data: {
                 type: SchemaType.OBJECT,
                 properties: {
                   handle: { type: SchemaType.STRING },
@@ -157,30 +168,43 @@ export default function ShopifyImporterPage() {
                 },
                 required: ["handle", "title", "body_html", "vendor", "product_type", "tags", "published", "variants"]
               },
-              amazon_technical_data: {
+              amazon_fba_data: {
                 type: SchemaType.OBJECT,
                 properties: {
-                  optimized_title: { type: SchemaType.STRING },
+                  flat_file_mapping: {
+                    type: SchemaType.OBJECT,
+                    properties: {
+                      item_name: { type: SchemaType.STRING },
+                      item_type_keyword: { type: SchemaType.STRING },
+                      external_product_id_type: { type: SchemaType.STRING },
+                      standard_price: { type: SchemaType.STRING },
+                      brand_name: { type: SchemaType.STRING },
+                      feed_product_type: { type: SchemaType.STRING }
+                    }
+                  },
                   power_bullets: {
                     type: SchemaType.ARRAY,
                     items: { type: SchemaType.STRING }
                   },
                   backend_search_terms: { type: SchemaType.STRING },
-                  item_type_keyword: { type: SchemaType.STRING },
-                  target_audience: { type: SchemaType.STRING },
-                  ai_semantic_summary: { type: SchemaType.STRING },
-                  inventory_loader_mapping: {
-                    type: SchemaType.OBJECT,
-                    properties: {
-                      item_type_keyword: { type: SchemaType.STRING },
-                      standard_product_id_type: { type: SchemaType.STRING }
-                    }
-                  }
+                  rufus_semantic_context: { type: SchemaType.STRING }
                 },
-                required: ["optimized_title", "power_bullets", "backend_search_terms", "item_type_keyword", "target_audience", "ai_semantic_summary", "inventory_loader_mapping"]
+                required: ["flat_file_mapping", "power_bullets", "backend_search_terms", "rufus_semantic_context"]
+              },
+              aplus_content: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  module_1_header: { type: SchemaType.STRING },
+                  module_1_body: { type: SchemaType.STRING },
+                  module_2_header: { type: SchemaType.STRING },
+                  module_2_body: { type: SchemaType.STRING },
+                  module_3_header: { type: SchemaType.STRING },
+                  module_3_body: { type: SchemaType.STRING },
+                  image_alt_text: { type: SchemaType.STRING }
+                }
               }
             },
-            required: ["internal_id", "shopify_fields", "amazon_technical_data"]
+            required: ["sync_id", "shopify_data", "amazon_fba_data", "aplus_content"]
           }
         };
 
@@ -194,35 +218,21 @@ export default function ShopifyImporterPage() {
 
         const imagePart = await fileToGenerativePart(uploadedFile);
 
-        const prompt = `Role: You are a Senior Amazon Marketplace Strategist and Technical Data Engineer. Your goal is to convert raw product data into an "Elite Tier" Amazon FBA listing that is 100% compliant with Amazon's Style Guides and optimized for high-conversion mobile shopping.
+        const prompt = `Role: You are the "ShopsReady" Multi-Channel Data Architect. Your mission is to ingest raw supplier data and output a perfectly synchronized JSON object that powers a Shopify CSV and an Amazon Pro-FBA Flat File.
 
-Task: Analyze the attached PDF/Image. Extract and structure data for Shopify/Amazon.
-
-Amazon Listing instructions:
-1. Title Architecture (Mobile-First):
-   Formula: [Brand] + [Core Keyword] + [Top Benefit] + [Key Material/Feature] + [Unit Count/Size/Color].
-   Ensure it is between 150-190 characters. Ensure most important keywords are in the first 80 characters.
-
-2. Power-Bullet Logic (5 Bullets):
-   Each bullet MUST start with a BOLDED CAPITALIZED HEADER followed by a colon.
-   Bullet 1 (Immediate Solution): What is the "Job to be Done"?
-   Bullet 2 (Technical Superiority): Durability, materials, and craftsmanship.
-   Bullet 3 (User Experience): Explain the "feel" or specific use case.
-   Bullet 4 (Safety & Compliance): Mention certifications (FDA, BPA-free), exact dimensions in inches, care instructions.
-   Bullet 5 (The Brand Promise): Call to action regarding quality and support.
-
-3. Technical Meta-Data:
-   item_type_keyword: Suggest accurate Amazon "Item Type Keyword" for Flat File.
-   backend_search_terms: 250 bytes. No brand names, no commas, no repetition.
-   target_audience: Explicitly state who this is for and where it should be used.
-
-4. SEO for "Rufus" (Amazon AI):
-   ai_semantic_summary: 3-sentence description for AI crawlers to help product surface in natural language queries.
+Core Directives:
+1. Technical Mapping: Identify exact Amazon feed_product_type and item_type_keyword.
+2. SEO Dominance: Generate a "Mobile-First" title (150-190 chars, critical keywords in first 80).
+3. Power Bullets: 5 bullets starting with BOLDED CAPS BENEFITS.
+   Bullet 1: Problem/Solution; Bullet 2: Quality/Build; Bullet 3: Versatility; Bullet 4: Tech Specs; Bullet 5: Trust/Guarantee.
+4. AI Search (Rufus) Optimization: Include a 3-sentence conversational summary answering buyer questions.
+5. SKU Sync: Ensure sync_id is the primary variant SKU for both platforms.
+6. A+ Content Strategy: Breakdown technical specs into 3 storytelling modules (header/body) for A+ Content.
 
 Shopify Requirements:
-- HTML descriptions (<p>, <ul>, <li>).
+- HTML formatted description.
 - grams: 500 default.
-- handle: unique slugs.`;
+- handle: slugified title.`;
 
         const result = await model.generateContent([prompt, imagePart]);
         const response = await result.response;
@@ -245,44 +255,54 @@ Shopify Requirements:
         await new Promise(resolve => setTimeout(resolve, 2000));
         const mockProducts: UnifiedProduct[] = [
           {
-            internal_id: '1',
-            shopify_fields: {
-              handle: 'classic-denim-jacket',
-              title: 'Classic Denim Jacket',
-              body_html: '<p>Premium denim jacket.</p>',
+            sync_id: 'URB-DENIM-001',
+            shopify_data: {
+              handle: 'urban-rugged-denim-jacket',
+              title: 'Urban Threads Rugged Denim Jacket',
+              body_html: '<h1>The Ultimate Rugged Denim Jacket</h1><p>Designed for durability and style.</p>',
               vendor: 'Urban Threads',
               product_type: 'Outerwear',
-              tags: 'denim, jacket',
+              tags: 'denim, jacket, men fashion, rugged',
               published: 'TRUE',
               variants: [
                 {
-                  option1_name: 'Title',
-                  option1_value: 'Default Title',
-                  variant_sku: 'DNM-JKT-001',
-                  variant_grams: 500,
-                  variant_price: '89.99',
-                  variant_inventory_qty: 45,
+                  option1_name: 'Color',
+                  option1_value: 'Deep Indigo',
+                  variant_sku: 'URB-DENIM-001',
+                  variant_grams: 850,
+                  variant_price: '129.99',
+                  variant_inventory_qty: 150,
                   variant_inventory_tracker: 'shopify'
                 }
               ]
             },
-            amazon_technical_data: {
-              optimized_title: 'Urban Threads Classic Denim Jacket - Mobile Optimized Rugged Outerwear - Men\'s Medium Blue - Durable Cotton',
+            amazon_fba_data: {
+              flat_file_mapping: {
+                item_name: 'Urban Threads Classic Denim Jacket - Mobile Optimized Rugged Outerwear - Men\'s Medium Blue - Durable Cotton',
+                item_type_keyword: 'jackets',
+                external_product_id_type: 'UPC',
+                standard_price: '129.99',
+                brand_name: 'Urban Threads',
+                feed_product_type: 'outerwear'
+              },
               power_bullets: [
                 'IMMEDIATE SOLUTION: Provides instant warmth and a timeless rugged aesthetic for shifting seasons.',
                 'TECHNICAL SUPERIORITY: Reinforced with 14oz heavy-duty denim and double-stitched seams for maximum durability.',
                 'USER EXPERIENCE: Designed for a relaxed fit that feels broken-in from Day 1, ideal for layering.',
-                'SAFETY & COMPLIANCE: 100% Cotton; Lead-free buttons; Machine washable. Back length measures 28 inches.',
-                'THE BRAND PROMISE: We stand by our craftsmanship with a 5-year guarantee on all stitching and fabric.'
+                'SPECIFICATIONS: 100% Cotton construction; Lead-free buttons; Machine washable. Back length measures 28 inches.',
+                'TRUST: We stand by our craftsmanship with a 5-year guarantee on all stitching and fabric.'
               ],
               backend_search_terms: 'denim jacket blue outerwear men fashion rugged classic gift daily wear worker style',
-              item_type_keyword: 'jacket',
-              target_audience: 'Fashion-forward men looking for durable everyday outerwear.',
-              ai_semantic_summary: 'A classic denim jacket that balances style and durability. Ideal for men seeking a reliable piece for layering in spring or autumn. Made from pre-shrunk cotton for a perfect fit.',
-              inventory_loader_mapping: {
-                item_type_keyword: 'jacket',
-                standard_product_id_type: 'UPC'
-              }
+              rufus_semantic_context: 'This Urban Threads denim jacket is the ideal blend of durability and comfort for craftsmen and urban explorers. It features reinforced denim perfect for spring or autumn layering.'
+            },
+            aplus_content: {
+              module_1_header: 'Engineered for the Elements',
+              module_1_body: 'Our denim is woven with a high-density technique that resists abrasions and wins against the wind.',
+              module_2_header: 'Artisanal Craftsmanship',
+              module_2_body: 'Every seam is double-locked to ensure that your jacket lasts a lifetime, not just a season.',
+              module_3_header: 'The Perfect Fit',
+              module_3_body: 'A tailored yet comfortable silhouette designed for the modern man on the move.',
+              image_alt_text: 'Model wearing a deep indigo denim jacket in an urban industrial environment'
             }
           }
         ];
@@ -307,13 +327,13 @@ Shopify Requirements:
   const handleShopifyChange = (pIdx: number, field: string, value: string) => {
     const updated = [...products];
     const product = updated[pIdx];
-    (product.shopify_fields as any)[field] = value;
+    (product.shopify_data as any)[field] = value;
     setProducts(updated);
   };
 
   const handleVariantChange = (pIdx: number, vIdx: number, field: keyof ShopifyVariant, value: string) => {
     const updated = [...products];
-    const variant = updated[pIdx].shopify_fields.variants[vIdx];
+    const variant = updated[pIdx].shopify_data.variants[vIdx];
     if (field === 'variant_grams' || field === 'variant_inventory_qty') {
       (variant[field] as number) = Number(value);
     } else {
@@ -331,15 +351,15 @@ Shopify Requirements:
     
     const rows: any[] = [];
     products.forEach(p => {
-      p.shopify_fields.variants.forEach(v => {
+      p.shopify_data.variants.forEach(v => {
         rows.push([
-          p.shopify_fields.handle,
-          p.shopify_fields.title,
-          p.shopify_fields.body_html,
-          p.shopify_fields.vendor,
-          p.shopify_fields.product_type,
-          p.shopify_fields.tags,
-          p.shopify_fields.published,
+          p.shopify_data.handle,
+          p.shopify_data.title,
+          p.shopify_data.body_html,
+          p.shopify_data.vendor,
+          p.shopify_data.product_type,
+          p.shopify_data.tags,
+          p.shopify_data.published,
           v.option1_name,
           v.option1_value,
           v.variant_price,
@@ -370,6 +390,50 @@ Shopify Requirements:
     link.click();
   };
 
+  const generateAmazonFlatFile = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Template');
+    
+    // Simulating Amazon Flat File Headers
+    worksheet.columns = [
+      { header: 'item_name', key: 'item_name', width: 40 },
+      { header: 'brand_name', key: 'brand_name', width: 20 },
+      { header: 'external_product_id', key: 'external_product_id', width: 20 },
+      { header: 'external_product_id_type', key: 'external_product_id_type', width: 10 },
+      { header: 'standard_price', key: 'standard_price', width: 10 },
+      { header: 'item_type_keyword', key: 'item_type_keyword', width: 20 },
+      { header: 'feed_product_type', key: 'feed_product_type', width: 20 },
+      { header: 'seller_sku', key: 'seller_sku', width: 20 },
+      { header: 'bullet_point1', key: 'bullet_point1', width: 40 },
+      { header: 'bullet_point2', key: 'bullet_point2', width: 40 },
+      { header: 'bullet_point3', key: 'bullet_point3', width: 40 },
+      { header: 'bullet_point4', key: 'bullet_point4', width: 40 },
+      { header: 'bullet_point5', key: 'bullet_point5', width: 40 },
+      { header: 'generic_keywords', key: 'generic_keywords', width: 40 },
+    ];
+
+    products.forEach(p => {
+      worksheet.addRow({
+        item_name: p.amazon_fba_data.flat_file_mapping.item_name,
+        brand_name: p.amazon_fba_data.flat_file_mapping.brand_name,
+        external_product_id: '', // To be filled by user
+        external_product_id_type: p.amazon_fba_data.flat_file_mapping.external_product_id_type,
+        standard_price: p.amazon_fba_data.flat_file_mapping.standard_price,
+        item_type_keyword: p.amazon_fba_data.flat_file_mapping.item_type_keyword,
+        feed_product_type: p.amazon_fba_data.flat_file_mapping.feed_product_type,
+        seller_sku: p.sync_id,
+        bullet_point1: p.amazon_fba_data.power_bullets[0] || '',
+        bullet_point2: p.amazon_fba_data.power_bullets[1] || '',
+        bullet_point3: p.amazon_fba_data.power_bullets[2] || '',
+        bullet_point4: p.amazon_fba_data.power_bullets[3] || '',
+        bullet_point5: p.amazon_fba_data.power_bullets[4] || '',
+        generic_keywords: p.amazon_fba_data.backend_search_terms
+      });
+    });
+
+    return await workbook.xlsx.writeBuffer();
+  };
+
   const downloadMultiChannelPackage = async () => {
     const zip = new JSZip();
     
@@ -377,24 +441,33 @@ Shopify Requirements:
     zip.file('shopify_import.csv', generateCSV());
     
     // 2. Amazon Listings (Text format)
-    let amazonContent = "AMAZON PRODUCT LISTINGS\n=======================\n\n";
+    let amazonContent = "SHOPSREADY ARCHITECT - AMAZON FBA SYNC\n======================================\n\n";
     products.forEach(p => {
-      amazonContent += `Product: ${p.shopify_fields.title}\n`;
-      amazonContent += `Amazon Optimized Title: ${p.amazon_technical_data.optimized_title}\n`;
-      amazonContent += `Item Type Keyword: ${p.amazon_technical_data.item_type_keyword}\n`;
-      amazonContent += `Target Audience: ${p.amazon_technical_data.target_audience}\n`;
-      amazonContent += `Backend Search Terms: ${p.amazon_technical_data.backend_search_terms}\n`;
-      amazonContent += `AI Semantic Summary: ${p.amazon_technical_data.ai_semantic_summary}\n\n`;
+      amazonContent += `Product: ${p.shopify_data.title}\n`;
+      amazonContent += `Sync ID (SKU): ${p.sync_id}\n`;
+      amazonContent += `Amazon Optimized Title: ${p.amazon_fba_data.flat_file_mapping.item_name}\n`;
+      amazonContent += `Feed Product Type: ${p.amazon_fba_data.flat_file_mapping.feed_product_type}\n`;
+      amazonContent += `Item Type Keyword: ${p.amazon_fba_data.flat_file_mapping.item_type_keyword}\n`;
+      amazonContent += `Backend Search Terms: ${p.amazon_fba_data.backend_search_terms}\n`;
+      amazonContent += `Rufus AI Semantic Context: ${p.amazon_fba_data.rufus_semantic_context}\n\n`;
       amazonContent += `Power Bullets:\n`;
-      p.amazon_technical_data.power_bullets.forEach((bp, i) => {
+      p.amazon_fba_data.power_bullets.forEach((bp, i) => {
         amazonContent += `${i+1}. ${bp}\n`;
       });
+      amazonContent += `\nA+ CONTENT STRATEGY:\n`;
+      amazonContent += `Module 1: ${p.aplus_content.module_1_header} - ${p.aplus_content.module_1_body}\n`;
+      amazonContent += `Module 2: ${p.aplus_content.module_2_header} - ${p.aplus_content.module_2_body}\n`;
+      amazonContent += `Module 3: ${p.aplus_content.module_3_header} - ${p.aplus_content.module_3_body}\n`;
       amazonContent += "\n-----------------------\n\n";
     });
     zip.file('amazon_listings.txt', amazonContent);
+
+    // 3. Amazon Flat File (Excel)
+    const excelBuffer = await generateAmazonFlatFile();
+    zip.file('amazon_fba_flat_file.xlsx', excelBuffer);
     
     const content = await zip.generateAsync({ type: 'blob' });
-    saveAs(content, 'ShopsReady_MultiChannel_Package.zip');
+    saveAs(content, 'ShopsReady_Architect_Package.zip');
   };
 
   const handleConfirm = () => {
@@ -582,7 +655,7 @@ Shopify Requirements:
               <div className="text-center md:text-left">
                 <h2 className="text-lg md:text-xl font-bold text-slate-900 leading-none mb-1">Review Your Products</h2>
                 <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
-                  <span className="text-green-600 font-black">{products.length} Products</span> • {products.reduce((acc, p) => acc + p.shopify_fields.variants.length, 0)} Variants Detected
+                  <span className="text-green-600 font-black">{products.length} Products</span> • {products.reduce((acc, p) => acc + p.shopify_data.variants.length, 0)} Variants Detected
                 </p>
               </div>
               <div className="flex gap-3 w-full md:w-auto">
@@ -603,7 +676,7 @@ Shopify Requirements:
 
             <div className="space-y-6">
               {products.map((product, pIdx) => (
-                <div key={product.internal_id || pIdx} className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden animate-in fade-in duration-300">
+                <div key={product.sync_id || pIdx} className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden animate-in fade-in duration-300">
                   <div className="p-4 md:p-6 space-y-6">
                     {/* Header Row */}
                     <div className="flex items-center justify-between border-b border-slate-200 pb-4">
@@ -612,13 +685,13 @@ Shopify Requirements:
                           {pIdx + 1}
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-900 text-sm">Product #{pIdx + 1}</h3>
-                          <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Review detected information</p>
+                          <h3 className="font-bold text-slate-900 text-sm">Sync ID: <span className="text-emerald-600">{product.sync_id}</span></h3>
+                          <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Multi-Channel Synchronization Active</p>
                         </div>
                       </div>
                       <div className="flex gap-2">
+                        <div className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold rounded-full border border-blue-100 uppercase tracking-tight">FBA Ready</div>
                         <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-bold rounded-full border border-emerald-100 uppercase tracking-tight">Shopify Ready</div>
-                        <div className="px-2 py-0.5 bg-orange-50 text-orange-700 text-[9px] font-bold rounded-full border border-orange-100 uppercase tracking-tight">Amazon Ready</div>
                       </div>
                     </div>
 
@@ -630,16 +703,16 @@ Shopify Requirements:
                             <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Title</label>
                             <input
                               type="text"
-                              value={product.shopify_fields.title}
+                              value={product.shopify_data.title}
                               onChange={(e) => handleShopifyChange(pIdx, 'title', e.target.value)}
                               className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-slate-900 outline-none transition-all"
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Vendor</label>
+                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Brand / Vendor</label>
                             <input
                               type="text"
-                              value={product.shopify_fields.vendor}
+                              value={product.shopify_data.vendor}
                               onChange={(e) => handleShopifyChange(pIdx, 'vendor', e.target.value)}
                               className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-slate-700 outline-none transition-all"
                             />
@@ -648,19 +721,19 @@ Shopify Requirements:
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Handle / URL</label>
+                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Shopify Handle</label>
                             <input
                               type="text"
-                              value={product.shopify_fields.handle}
+                              value={product.shopify_data.handle}
                               onChange={(e) => handleShopifyChange(pIdx, 'handle', e.target.value)}
                               className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-400 text-xs font-mono text-slate-600 outline-none"
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Type / Category</label>
+                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Category / Type</label>
                             <input
                               type="text"
-                              value={product.shopify_fields.product_type}
+                              value={product.shopify_data.product_type}
                               onChange={(e) => handleShopifyChange(pIdx, 'product_type', e.target.value)}
                               className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 text-sm font-semibold text-slate-700 outline-none"
                             />
@@ -673,30 +746,30 @@ Shopify Requirements:
                         <div className="flex items-center justify-between border-b border-slate-300 pb-2">
                           <span className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">Elite FBA Strategy</span>
                           <button 
-                            onClick={() => setActiveAmazonToolId(activeAmazonToolId === product.internal_id ? null : product.internal_id)}
+                            onClick={() => setActiveAmazonToolId(activeAmazonToolId === product.sync_id ? null : product.sync_id)}
                             className="text-[9px] font-bold text-orange-600 hover:text-orange-700 underline flex items-center gap-1"
                           >
                             <Sparkles className="w-3 h-3" />
-                            {activeAmazonToolId === product.internal_id ? 'Hide Strategy' : 'View Full Optimization'}
+                            {activeAmazonToolId === product.sync_id ? 'Hide Strategy' : 'View Full Architect View'}
                           </button>
                         </div>
                         <div className="space-y-2">
                           <div className="space-y-0.5">
-                            <span className="text-[8px] font-bold text-slate-500 uppercase">Item Type Keyword</span>
-                            <p className="text-xs font-bold text-slate-700 truncate">{product.amazon_technical_data.item_type_keyword}</p>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase">Item Type Keyword</span>
+                            <p className="text-xs font-bold text-slate-700 truncate">{product.amazon_fba_data.flat_file_mapping.item_type_keyword}</p>
                           </div>
                           <div className="space-y-0.5">
-                            <span className="text-[8px] font-bold text-slate-500 uppercase">Target Audience</span>
-                            <p className="text-[10px] text-slate-600 line-clamp-1 italic">{product.amazon_technical_data.target_audience}</p>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase">Feed Product Type</span>
+                            <p className="text-[10px] text-slate-600 font-mono">{product.amazon_fba_data.flat_file_mapping.feed_product_type}</p>
                           </div>
                           <div className="space-y-1">
-                            <span className="text-[8px] font-bold text-slate-500 uppercase">Mobile-First Title</span>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase">Mobile-First Title</span>
                             <div className="group/copy relative">
                                 <p className="text-[10px] font-medium text-slate-800 line-clamp-2 bg-white p-2 rounded border border-slate-200 leading-tight">
-                                    {product.amazon_technical_data.optimized_title}
+                                    {product.amazon_fba_data.flat_file_mapping.item_name}
                                 </p>
                                 <button 
-                                    onClick={() => navigator.clipboard.writeText(product.amazon_technical_data.optimized_title)}
+                                    onClick={() => navigator.clipboard.writeText(product.amazon_fba_data.flat_file_mapping.item_name)}
                                     className="absolute right-1 top-1 p-1 bg-slate-100 rounded opacity-0 group-hover/copy:opacity-100 transition-opacity"
                                     title="Copy Title"
                                 >
@@ -709,68 +782,87 @@ Shopify Requirements:
                     </div>
 
                     {/* AI Preview Section */}
-                    {activeAmazonToolId === product.internal_id && (
+                    {activeAmazonToolId === product.sync_id && (
                       <div className="p-4 bg-slate-900 rounded-xl text-white animate-in slide-in-from-top-2 duration-300">
                         <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
                             <div>
-                                <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">FBA Power Bullets</h4>
-                                <p className="text-[9px] text-slate-400 mt-1">Benefit-Driven • Mobile Optimized</p>
+                                <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">FBA Architect View</h4>
+                                <p className="text-[9px] text-slate-400 mt-1">Benefit-Driven • Mobile Optimized • Rufus AI Ready</p>
                             </div>
                             <div className="text-[10px] text-slate-400 font-medium text-right">
-                                <span className="block">HEADERS: BOLD & CAPS</span>
-                                <span className="block opacity-50 text-[8px]">Job to be Done • Technical • UX</span>
+                                <span className="block italic text-orange-400">Sync Global SKU: {product.sync_id}</span>
                             </div>
                         </div>
                         
-                        <div className="grid grid-cols-1 gap-3">
-                          {product.amazon_technical_data.power_bullets.map((bp, i) => (
-                            <div key={i} className="flex items-start gap-3 group/bp bg-white/5 p-3 rounded-lg border border-white/10 hover:border-emerald-500/50 transition-all">
-                              <div className="flex-1 text-[11px] text-slate-200 leading-relaxed">
-                                {bp.includes(':') ? (
-                                    <>
-                                        <span className="font-black text-white uppercase tracking-wider">{bp.split(':')[0]}:</span>
-                                        {bp.split(':').slice(1).join(':')}
-                                    </>
-                                ) : (
-                                    bp
-                                )}
-                              </div>
-                              <button 
-                                onClick={() => navigator.clipboard.writeText(bp)}
-                                className="p-1.5 bg-white/10 rounded-md hover:bg-emerald-500 transition-colors"
-                                title="Copy Bullet Point"
-                              >
-                                <Check className="w-3 h-3 text-white" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="pt-4 border-t border-white/10">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Backend Search Terms (250 bytes)</span>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                                <h5 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">A9 Algorithm Power Bullets</h5>
+                                <div className="grid grid-cols-1 gap-2">
+                                {product.amazon_fba_data.power_bullets.map((bp, i) => (
+                                    <div key={i} className="flex items-start gap-3 group/bp bg-white/5 p-3 rounded-lg border border-white/10 hover:border-emerald-500/50 transition-all">
+                                    <div className="flex-1 text-[11px] text-slate-200 leading-relaxed">
+                                        {bp.includes(':') ? (
+                                            <>
+                                                <span className="font-black text-white uppercase tracking-wider">{bp.split(':')[0]}:</span>
+                                                {bp.split(':').slice(1).join(':')}
+                                            </>
+                                        ) : (
+                                            bp
+                                        )}
+                                    </div>
                                     <button 
-                                        onClick={() => navigator.clipboard.writeText(product.amazon_technical_data.backend_search_terms)}
-                                        className="text-[9px] text-emerald-400 hover:underline"
+                                        onClick={() => navigator.clipboard.writeText(bp)}
+                                        className="p-1.5 bg-white/10 rounded-md hover:bg-emerald-500 transition-colors"
+                                        title="Copy Bullet Point"
                                     >
-                                        Copy Keywords
+                                        <Check className="w-3 h-3 text-white" />
                                     </button>
+                                    </div>
+                                ))}
                                 </div>
-                                <p className="text-[10px] font-mono text-slate-500 bg-black/30 p-2 rounded break-words min-h-[40px]">
-                                    {product.amazon_technical_data.backend_search_terms}
-                                </p>
+
+                                <div className="pt-4 border-t border-white/10">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[8px] font-bold text-cyan-400 uppercase tracking-widest">Rufus AI Semantic Context</span>
+                                            <Sparkles className="w-2.5 h-2.5 text-cyan-400" />
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-slate-300 leading-relaxed italic bg-black/20 p-3 rounded-lg border border-white/5">
+                                        "{product.amazon_fba_data.rufus_semantic_context}"
+                                    </p>
+                                </div>
                             </div>
-                            <div className="pt-4 border-t border-white/10">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[8px] font-bold text-cyan-400 uppercase tracking-widest">Rufus SEO (AI Crawler Context)</span>
-                                        <Sparkles className="w-2.5 h-2.5 text-cyan-400" />
+
+                            <div className="space-y-4">
+                                <h5 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">A+ Content Storytelling Modules</h5>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {[1, 2, 3].map((num) => (
+                                        <div key={num} className="bg-white/5 p-3 rounded-lg border border-white/10">
+                                            <span className="text-[8px] font-bold text-orange-400 uppercase mb-1 block">Module {num}: {(product.aplus_content as any)[`module_${num}_header`]}</span>
+                                            <p className="text-[10px] text-slate-400 leading-tight">{(product.aplus_content as any)[`module_${num}_body`]}</p>
+                                        </div>
+                                    ))}
+                                    <div className="bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/20">
+                                        <span className="text-[8px] font-bold text-emerald-400 uppercase mb-1 block">SEO Image Alt Text</span>
+                                        <p className="text-[10px] text-slate-300 italic">{product.aplus_content.image_alt_text}</p>
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-slate-400 leading-relaxed italic">
-                                    {product.amazon_technical_data.ai_semantic_summary}
-                                </p>
+
+                                <div className="pt-4 border-t border-white/10">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">FBA Backend Keywords</span>
+                                        <button 
+                                            onClick={() => navigator.clipboard.writeText(product.amazon_fba_data.backend_search_terms)}
+                                            className="text-[9px] text-emerald-400 hover:underline"
+                                        >
+                                            Copy All
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] font-mono text-slate-500 bg-black/30 p-2 rounded break-words">
+                                        {product.amazon_fba_data.backend_search_terms}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                       </div>
@@ -778,19 +870,19 @@ Shopify Requirements:
 
                     {/* Variants Table */}
                     <div className="space-y-2">
-                      <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">Product Variants</h4>
+                      <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">Synchronized Variant Matrix</h4>
                       <div className="border border-slate-300 rounded-lg overflow-hidden shadow-sm">
                         <table className="w-full text-left text-xs">
                           <thead>
                             <tr className="bg-slate-100 border-b border-slate-300">
-                              <th className="p-2 font-bold text-slate-600 uppercase tracking-tighter">Variant Value</th>
-                              <th className="p-2 font-bold text-slate-600 text-center uppercase tracking-tighter">Price</th>
-                              <th className="p-2 font-bold text-slate-600 uppercase tracking-tighter">SKU</th>
-                              <th className="p-2 font-bold text-slate-600 text-center uppercase tracking-tighter">Stock</th>
+                              <th className="p-2 font-bold text-slate-600 uppercase tracking-tighter">Variant Property</th>
+                              <th className="p-2 font-bold text-slate-600 text-center uppercase tracking-tighter">Sync Price</th>
+                              <th className="p-2 font-bold text-slate-600 uppercase tracking-tighter">Global SKU (Link)</th>
+                              <th className="p-2 font-bold text-slate-600 text-center uppercase tracking-tighter">Sync Stock</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200">
-                            {product.shopify_fields.variants.map((v, vIdx) => (
+                            {product.shopify_data.variants.map((v, vIdx) => (
                               <tr key={vIdx} className="hover:bg-slate-50 transition-colors">
                                 <td className="p-2">
                                   <input
@@ -816,7 +908,7 @@ Shopify Requirements:
                                     type="text"
                                     value={v.variant_sku}
                                     onChange={(e) => handleVariantChange(pIdx, vIdx, 'variant_sku', e.target.value)}
-                                    className="w-full bg-transparent font-mono text-[10px] text-slate-500 outline-none"
+                                    className="w-full bg-transparent font-mono text-[10px] text-emerald-600 font-bold outline-none"
                                   />
                                 </td>
                                 <td className="p-2 w-20 text-center">
@@ -861,47 +953,66 @@ Shopify Requirements:
         )}
 
         {currentStep === 3 && (
-          <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-2xl border border-slate-100 text-center max-w-xl mx-auto relative overflow-hidden">
+          <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-2xl border border-slate-100 text-center max-w-2xl mx-auto relative overflow-hidden">
             {/* Background Decoration */}
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500" />
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500" />
             <div className="absolute -top-16 -right-16 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl" />
             
-            <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner group transition-transform hover:scale-110 duration-500">
-              <Check className="w-10 h-10" />
+            <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner group transition-transform hover:rotate-6 duration-500">
+              <Sparkles className="w-12 h-12" />
             </div>
             
-            <div className="space-y-3 mb-10">
-              <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">You&apos;re <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-600">ShopsReady!</span></h2>
-              <p className="text-base text-slate-500 max-w-md mx-auto leading-relaxed">
-                Your high-conversion product data is ready for both **Shopify** and **Amazon**.
+            <div className="space-y-4 mb-10">
+              <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter leading-none">
+                Experience the <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-cyan-600">Elite Sync.</span>
+              </h2>
+              <p className="text-lg text-slate-600 max-w-md mx-auto leading-relaxed font-medium">
+                Our AI doesn&apos;t just copy data; it reconstructs your brand story for every platform.
               </p>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 mb-10 text-left relative group hover:border-emerald-500/30 transition-all">
+                <div className="absolute -top-3 -left-3 bg-emerald-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">ShopsReady Architect Active</div>
+                <p className="text-sm text-slate-700 leading-relaxed italic">
+                    "From Mobile-First Amazon Titles to A+ Storytelling, ShopsReady.com ensures your products are not just listed, but optimized for the modern buyer and Amazon&apos;s Rufus AI."
+                </p>
+                <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-emerald-600 uppercase tracking-widest">
+                    <Check className="w-3 h-3" /> Rufus Indexing Pre-Checked
+                    <span className="mx-2 text-slate-300">•</span>
+                    <Check className="w-3 h-3" /> A+ Storytelling Rendered
+                </div>
             </div>
             
             <div className="grid grid-cols-1 gap-4 mb-10 text-center">
               <button
                 onClick={() => downloadMultiChannelPackage()}
-                className="w-full py-5 bg-slate-900 text-white font-black rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10 flex items-center justify-center gap-3 text-lg group ring-4 ring-slate-50"
+                className="w-full py-6 bg-slate-900 text-white font-black rounded-3xl hover:bg-slate-800 transition-all shadow-2xl shadow-slate-900/20 flex items-center justify-center gap-4 text-xl group ring-8 ring-slate-50"
               >
-                <Package className="w-6 h-6 group-hover:rotate-12 transition-transform" /> Download Sync Package
+                <Download className="w-7 h-7 group-hover:translate-y-1 transition-transform" /> Download Elite Package
               </button>
               
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => downloadShopifyCSV()}
-                  className="py-3 bg-white border-2 border-slate-100 text-slate-600 font-bold rounded-xl hover:border-emerald-200 hover:text-emerald-700 transition-all flex items-center justify-center gap-2 text-xs shadow-sm"
+                  className="py-4 bg-white border-2 border-slate-100 text-slate-700 font-black rounded-2xl hover:border-emerald-500 hover:text-emerald-700 transition-all flex items-center justify-center gap-3 text-sm shadow-sm"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5" /> Shopify CSV
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-600" /> Shopify CSV
                 </button>
                 <button
                    onClick={() => downloadMultiChannelPackage()} 
-                   className="py-3 bg-white border-2 border-slate-100 text-slate-600 font-bold rounded-xl hover:border-orange-200 hover:text-orange-700 transition-all flex items-center justify-center gap-2 text-xs shadow-sm"
+                   className="py-4 bg-white border-2 border-slate-100 text-slate-700 font-black rounded-2xl hover:border-orange-500 hover:text-orange-700 transition-all flex items-center justify-center gap-3 text-sm shadow-sm"
                 >
-                  <Package className="w-3.5 h-3.5" /> Amazon Text
+                  <Package className="w-5 h-5 text-orange-500" /> Amazon Pro Package
                 </button>
               </div>
             </div>
 
-          
+            <button
+                onClick={handleStartOver}
+                className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] hover:text-slate-600 transition-all"
+            >
+                ← Start New Architectural Sync
+            </button>
           </div>
         )}
 
