@@ -5,18 +5,18 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 
 const EXAMPLES = [
   {
-    title: 'Shopify CSV Import',
-    before: 'Blue Jacket, SKU: BJ-01, Size: S, M, L, Price: 45',
-    after: 'Shopify-ready CSV generated. Handles: blue-jacket, Tags: Outerwear, 3 variants mapped (BJ-01-S, BJ-01-M, BJ-01-L) with automatic inventory sync. $45.00',
+    title: 'Master Architect Shopify Sync',
+    before: 'Rugged Denim Jacket, Price: 129.99, Sizes: S, M, L',
+    after: 'Marketing Layer Ready: Generated high-conversion Shopify CSV with <strong> HTML descriptions, synchronized variant SKUs, and mobile-optimized handles for $129.99.',
     color: 'from-emerald-500 to-teal-500',
-    icon: '📦'
+    icon: '🛍️'
   },
   {
-    title: 'Multi-Channel Sync',
-    before: 'Upload PDF supplier_catalog.pdf',
-    after: 'Extracted 15 products. Generated Shopify CSV + Amazon Listing Text. SEO-optimized bullet points and category mapping applied for instant cross-channel selling.',
+    title: 'Elite Amazon FBA Launch',
+    before: 'Upload supplier_data_v2.pdf',
+    after: 'Operational Layer Complete: Generated Pro-FBA Flat File with technical mapping, 5-point Power Bullets, Rufus AI semantic summaries, and A+ Storytelling modules for Amazon Readiness.',
     color: 'from-orange-500 to-amber-500',
-    icon: '🔄'
+    icon: '📑'
   },
 ];
 

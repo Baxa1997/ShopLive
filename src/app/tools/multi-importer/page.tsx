@@ -20,6 +20,11 @@ interface MasterArchitectVariant {
 
 interface UnifiedProduct {
   sync_id: string;
+  success_feedback: {
+    total_variants: number;
+    channels_ready: string[];
+    summary_message: string;
+  };
   shopify_service: {
     handle: string;
     title: string;
@@ -136,6 +141,18 @@ export default function ShopifyImporterPage() {
             type: SchemaType.OBJECT,
             properties: {
               sync_id: { type: SchemaType.STRING },
+              success_feedback: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  total_variants: { type: SchemaType.NUMBER },
+                  channels_ready: {
+                    type: SchemaType.ARRAY,
+                    items: { type: SchemaType.STRING }
+                  },
+                  summary_message: { type: SchemaType.STRING }
+                },
+                required: ["total_variants", "channels_ready", "summary_message"]
+              },
               shopify_service: {
                 type: SchemaType.OBJECT,
                 properties: {
@@ -235,6 +252,10 @@ Service 1: Technical Amazon Flat File (Operational)
 - bullets: 5 distinct benefits starting with BOLD CAPS.
 - Generate a unique sync_id / seller_sku (Formula: [Brand]-[Model]-[First Letter of Color/Size]).
 
+Service 6: Success Feedback (The Comfort Layer)
+- Provide a 3-sentence summary_message for the user explaining exactly what has been generated (e.g., "Synthesized 1 product with 3 variants. Created 100% compliant FBA metadata and SEO Shopify content.").
+- List channels_ready (e.g., ["Shopify", "Amazon FBA"]).
+
 Service 2: Shopify Multi-Channel Sync (Marketing)
 - Create a CSV-ready object with HTML <strong> and <li> tags.
 - Logic: Variant SKUs must EXTACLY match the sync_id for inventory synchronization.
@@ -275,6 +296,11 @@ Service 5: Technical Readiness Audit (Validation)
         const mockProducts: UnifiedProduct[] = [
           {
             sync_id: 'URB-DENIM-NAVY-M',
+            success_feedback: {
+              total_variants: 1,
+              channels_ready: ['Shopify', 'Amazon FBA'],
+              summary_message: 'Your Urban Threads denim jacket has been successfully transformed into a multi-channel launch package. We\'ve synchronized your SKUs and optimized your content for Amazon\'s Rufus AI.'
+            },
             shopify_service: {
               handle: 'urban-rugged-denim-jacket-navy',
               title: 'Urban Threads Rugged Denim Jacket - Navy',
@@ -494,6 +520,12 @@ Service 5: Technical Readiness Audit (Validation)
 
   const handleConfirm = () => {
     setCurrentStep(3);
+    setTimeout(() => {
+      const downloadSection = document.getElementById('download-section');
+      if (downloadSection) {
+        downloadSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const handleStartOver = () => {
@@ -549,7 +581,7 @@ Service 5: Technical Readiness Audit (Validation)
             { num: 3, label: 'Download CSV' }
           ].map((step, idx) => (
             <div key={step.num} className="flex-1 flex flex-col items-center relative z-10">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
                 currentStep > step.num ? 'bg-green-500 text-white' :
                 currentStep === step.num ? 'bg-green-600 text-white ring-4 ring-green-200' :
                 'bg-slate-200 text-slate-400'
@@ -688,7 +720,7 @@ Service 5: Technical Readiness Audit (Validation)
                   <Download className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" /> Sync Package
                 </button>
                 <button
-                  onClick={() => setCurrentStep(3)}
+                  onClick={() => handleConfirm()}
                   className="flex-1 md:flex-none px-5 py-2.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-all shadow-lg flex items-center justify-center gap-2"
                 >
                   Confirm & Sync <ArrowRight className="w-4 h-4" />
@@ -978,7 +1010,7 @@ Service 5: Technical Readiness Audit (Validation)
               </button>
               <div className="flex gap-4 w-full md:w-auto">
                 <button
-                  onClick={() => setCurrentStep(3)}
+                  onClick={() => handleConfirm()}
                   className="flex-1 md:flex-none px-12 py-5 bg-emerald-600 text-white font-black rounded-[1.5rem] hover:bg-emerald-700 transition-all shadow-2xl shadow-emerald-500/30 flex items-center justify-center gap-3 text-lg ring-4 ring-white"
                 >
                   Confirm & Sync All <ArrowRight className="w-6 h-6 animate-pulse" />
@@ -989,25 +1021,45 @@ Service 5: Technical Readiness Audit (Validation)
         )}
 
         {currentStep === 3 && (
-          <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-2xl border border-slate-100 text-center max-w-2xl mx-auto relative overflow-hidden">
+          <div id="download-section" className="bg-white rounded-[2.5rem] p-4 md:p-6 shadow-2xl border border-slate-100 text-center max-w-4xl mx-auto relative overflow-hidden">
             {/* Background Decoration */}
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500" />
             <div className="absolute -top-16 -right-16 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl" />
             
-            <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner group transition-transform hover:rotate-6 duration-500">
-              <Sparkles className="w-12 h-12" />
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-inner group transition-transform hover:rotate-6 duration-500">
+              <Sparkles className="w-6 h-6" />
             </div>
             
-            <div className="space-y-4 mb-10">
-              <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter leading-none">
+            <div className="space-y-4 mb-6 text-center">
+              <h2 className="text-4xl md:text-4xl font-black text-slate-900 tracking-tighter leading-none">
                 Experience the <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-cyan-600">Elite Sync.</span>
               </h2>
-              <p className="text-lg text-slate-600 max-w-md mx-auto leading-relaxed font-medium">
-                Our AI doesn&apos;t just copy data; it reconstructs your brand story for every platform.
-              </p>
+              {products.length > 0 && (
+                <p className="text-md w-full text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium">
+                  {products[0].success_feedback.summary_message}
+                </p>
+              )}
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 mb-10 text-left relative group hover:border-emerald-500/30 transition-all">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-left">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl relative group">
+                    <span className="text-[8px] font-black text-emerald-600 uppercase mb-2 block tracking-widest">Digital Operational Layer</span>
+                    <h5 className="text-[10px] font-bold text-slate-900 mb-1">Amazon FBA Flat File</h5>
+                    <p className="text-[9px] text-slate-500 leading-tight">Ready-to-upload .txt with mapped Browse Nodes and 5-point Power Bullets.</p>
+                </div>
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl relative group">
+                    <span className="text-[8px] font-black text-blue-600 uppercase mb-2 block tracking-widest">Marketing Layer</span>
+                    <h5 className="text-[10px] font-bold text-slate-900 mb-1">Shopify Multi-Sync</h5>
+                    <p className="text-[9px] text-slate-500 leading-tight">Synchronized SKUs and HTML descriptions with mobile-optimized titles.</p>
+                </div>
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl relative group">
+                    <span className="text-[8px] font-black text-orange-600 uppercase mb-2 block tracking-widest">Branding Layer</span>
+                    <h5 className="text-[10px] font-bold text-slate-900 mb-1">A+ Storytelling</h5>
+                    <p className="text-[9px] text-slate-500 leading-tight">Storytelling modules and SEO image alt-text for Amazon Brand Registry.</p>
+                </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4 mb-6 text-left relative group hover:border-emerald-500/30 transition-all">
                 <div className="absolute -top-3 -left-3 bg-emerald-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">ShopsReady Architect Active</div>
                 <p className="text-sm text-slate-700 leading-relaxed italic">
                     "From Mobile-First Amazon Titles to A+ Storytelling, ShopsReady.com ensures your products are not just listed, but optimized for the modern buyer and Amazon&apos;s Rufus AI."
@@ -1022,7 +1074,7 @@ Service 5: Technical Readiness Audit (Validation)
             <div className="grid grid-cols-1 gap-4 mb-10 text-center">
               <button
                 onClick={() => downloadMultiChannelPackage()}
-                className="w-full py-6 bg-slate-900 text-white font-black rounded-3xl hover:bg-slate-800 transition-all shadow-2xl shadow-slate-900/20 flex items-center justify-center gap-4 text-xl group ring-8 ring-slate-50"
+                className="w-full cursor-pointer py-4 bg-slate-900 text-white font-black rounded-3xl hover:bg-slate-800 transition-all shadow-2xl shadow-slate-900/20 flex items-center justify-center gap-4 text-xl group ring-8 ring-slate-50"
               >
                 <Download className="w-7 h-7 group-hover:translate-y-1 transition-transform" /> Download Elite Package
               </button>
@@ -1030,13 +1082,13 @@ Service 5: Technical Readiness Audit (Validation)
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => downloadShopifyCSV()}
-                  className="py-4 bg-white border-2 border-slate-100 text-slate-700 font-black rounded-2xl hover:border-emerald-500 hover:text-emerald-700 transition-all flex items-center justify-center gap-3 text-sm shadow-sm"
+                  className="py-4 cursor-pointer bg-white border-2 border-slate-100 text-slate-700 font-black rounded-2xl hover:border-emerald-500 hover:text-emerald-700 transition-all flex items-center justify-center gap-3 text-sm shadow-sm"
                 >
                   <FileSpreadsheet className="w-5 h-5 text-emerald-600" /> Shopify CSV
                 </button>
                 <button
                    onClick={() => downloadMultiChannelPackage()} 
-                   className="py-4 bg-white border-2 border-slate-100 text-slate-700 font-black rounded-2xl hover:border-orange-500 hover:text-orange-700 transition-all flex items-center justify-center gap-3 text-sm shadow-sm"
+                   className="py-4 bg-white cursor-pointer border-2 border-slate-100 text-slate-700 font-black rounded-2xl hover:border-orange-500 hover:text-orange-700 transition-all flex items-center justify-center gap-3 text-sm shadow-sm"
                 >
                   <Package className="w-5 h-5 text-orange-500" /> Amazon Pro Package
                 </button>
@@ -1045,7 +1097,7 @@ Service 5: Technical Readiness Audit (Validation)
 
             <button
                 onClick={handleStartOver}
-                className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] hover:text-slate-600 transition-all"
+                className="text-slate-400 cursor-pointer font-black text-[10px] uppercase tracking-[0.2em] hover:text-slate-600 transition-all"
             >
                 ← Start New Architectural Sync
             </button>

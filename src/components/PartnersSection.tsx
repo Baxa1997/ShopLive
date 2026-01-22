@@ -16,11 +16,11 @@ export default function PartnersSection() {
         
         <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-8 opacity-70 transition-all duration-500">
           {[
-            { name: 'USA', flag: '🇺🇸' },
-            { name: 'Canada', flag: '🇨🇦' },
-            { name: 'UK', flag: '🇬🇧' },
-            { name: 'Europe', flag: '🇪🇺' },
-            { name: 'Asian Sellers', flag: '🌏' }
+            { name: 'USA', flag: '🇺🇸', color: 'text-blue-600' },
+            { name: 'Canada', flag: '🇨🇦', color: 'text-red-500' },
+            { name: 'UK', flag: '🇬🇧', color: 'text-indigo-600' },
+            { name: 'Europe', flag: '🇪🇺', color: 'text-amber-500' },
+            { name: 'Asian Sellers', flag: '🌏', color: 'text-teal-600' }
           ].map((item, index) => (
             <motion.div 
               key={item.name}
@@ -28,10 +28,10 @@ export default function PartnersSection() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
               viewport={{ once: true }}
-              className="flex items-center gap-2 text-xl md:text-2xl font-bold font-heading transition-colors cursor-default group"
+              className={`flex items-center gap-2 text-xl md:text-2xl font-bold font-heading transition-all cursor-default group hover:scale-105`}
             >
               <span className="text-3xl">{item.flag}</span>
-              <span className="text-slate-400 grayscale group-hover:grayscale-0 transition-all">{item.name}</span>
+              <span className={`${item.color} grayscale-[0.5] group-hover:grayscale-0 transition-all`}>{item.name}</span>
             </motion.div>
           ))}
         </div>
