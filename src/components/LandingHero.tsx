@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles, ShoppingBag, Share2, Package, LayoutTemplate } from 'lucide-react';
+import { ArrowRight, Sparkles, ShoppingBag, Share2, Package, LayoutTemplate, FileText, Settings, Download } from 'lucide-react';
 import { Category } from '@/types';
 import { cn } from '@/lib/utils';
 
 const CATEGORY_BOXES: { label: string; icon: any; description: string; color: string; href?: string; badge?: string }[] = [
   { 
-    label: 'Unified Importer', 
+    label: 'PDF to Multi-Channel Tool', 
     icon: Package, 
-    description: 'Convert PDF & Supplier data into Shopify & Amazon CSVs in seconds',
+    description: 'Convert messy supplier catalogs into platform-ready files.',
     color: 'from-emerald-600 to-orange-500',
     href: '/tools/multi-importer',
     badge: 'New & Improved'
@@ -70,11 +70,11 @@ export default function LandingHero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
-          className="text-4xl md:text-7xl font-heading font-extrabold text-slate-900 tracking-tight mb-4 leading-[1.1]"
+          className="text-4xl md:text-7xl font-heading font-extrabold text-slate-900 tracking-tight mb-6 leading-[1.1]"
         >
-          Unified <br />
+          From Supplier PDF <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-500 to-orange-500">
-            Multi-Channel Importer
+            to Shopify & Amazon in 60 Seconds.
           </span>
         </motion.h1>
 
@@ -84,8 +84,23 @@ export default function LandingHero() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed font-body"
         >
-          ShopsReady is the smartest way to scale your e-commerce. Convert PDFs, images, and raw text into high-converting <span className="text-emerald-600 font-bold">Shopify CSVs</span> and <span className="text-orange-500 font-bold">Amazon Listings</span> instantly.
+          Stop manual data entry. Upload any supplier PDF or image, and our Architect engine generates structured Shopify CSVs and Amazon Inventory Files instantly.
         </motion.p>
+        
+        <motion.div
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ delay: 0.3, duration: 0.5 }}
+           className="flex justify-center mb-16"
+        >
+            <Link 
+              href="/tools/multi-importer" 
+              className="group inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-emerald-600 rounded-full hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-500/30 transform hover:-translate-y-1"
+            >
+              Start Importing Now — It's Free
+              <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+        </motion.div>
       </div>
 
       {/* Tabs as Boxes */}
@@ -99,7 +114,7 @@ export default function LandingHero() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + index * 0.05 }}
                 className={cn(
-                  "group relative h-72 rounded-[2rem] p-8 bg-white border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col justify-between transition-all duration-150",
+                  "group relative h-auto min-h-[22rem] rounded-[2rem] p-8 bg-white border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col justify-between transition-all duration-150",
                   isComingSoon ? "cursor-default opacity-80" : "cursor-pointer"
                 )}
               >
@@ -136,21 +151,26 @@ export default function LandingHero() {
                     <p className="text-slate-500 font-medium text-sm max-w-[80%]">
                       {box.description}
                     </p>
-                    {box.label === 'Unified Importer' && (
-                      <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-100 w-fit">
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-lg shadow-sm border border-slate-100">
-                          <span className="text-[10px] font-black text-rose-500">PDF</span>
+                    {box.label === 'PDF to Multi-Channel Tool' && (
+                      <div className="mt-4 space-y-3">
+                        <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
+                          <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <span>Step 1: Upload Supplier PDF</span>
                         </div>
-                        <ArrowRight className="w-3 h-3 text-slate-300" />
-                        <div className="flex -space-x-2">
-                           <div className="w-6 h-6 rounded-lg bg-[#95BF47] flex items-center justify-center border-2 border-white shadow-sm">
-                             <span className="text-[8px] font-bold text-white">S</span>
-                           </div>
-                           <div className="w-6 h-6 rounded-lg bg-[#FF9900] flex items-center justify-center border-2 border-white shadow-sm">
-                             <span className="text-[8px] font-bold text-white">A</span>
-                           </div>
+                        <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
+                           <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600">
+                            <Settings className="w-4 h-4" />
+                          </div>
+                          <span>Step 2: AI extracts SKUs & Details</span>
                         </div>
-                        <span className="text-[10px] font-black text-slate-400">CSV READY</span>
+                        <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
+                           <div className="p-1.5 bg-orange-50 rounded-lg text-orange-600">
+                            <Download className="w-4 h-4" />
+                          </div>
+                          <span>Step 3: Download Amazon .txt or Shopify .csv</span>
+                        </div>
                       </div>
                     )}
                   </div>
