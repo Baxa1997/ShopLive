@@ -6,19 +6,19 @@ import { Sparkles } from 'lucide-react';
 
 const transformations = [
   {
-    before: "hey can u send me the report asap thx",
-    after: "Good morning! Could you please send me the report at your earliest convenience? Thank you for your assistance.",
-    category: "Email Polish"
+    before: "Mens Tee - Red, Blu, Grn (S-XL) - $12.50/ea",
+    after: "Title: Mens Premium Tee | Option1: Color (Red, Blue, Green) | Option2: Size (S, M, L, XL) | Price: $25.00 | Cost: $12.50",
+    category: "PDF to Shopify"
   },
   {
-    before: "photo of me at beach",
-    after: "Salt water, sun-kissed hair, and endless horizons. 🌊✨ Living for these golden hour moments. #BeachVibes #SummerBliss",
-    category: "Social Caption"
+    before: "kitchen knife set 6 pcs stainless steel sharp",
+    after: "Professional 6-Piece Kitchen Knife Set | High-Carbon Stainless Steel Blades | Ergonomic Handles | Rust-Resistant & Ultra-Sharp Chef Set",
+    category: "Amazon Optimization"
   },
   {
-    before: "Blue Shirt, M, $15",
-    after: "Premium Cotton T-Shirt - Classic Blue | Size M | Soft, Breathable Fabric - Perfect for Everyday Wear | $15.00",
-    category: "Product Title"
+    before: "Inv Update: SKU 8821 is low, maybe 5 left",
+    after: "Update Inventory: SKU 8821 | Qty: 5 | Status: Low Stock Warning | Action: Reorder Triggered",
+    category: "Inventory Sync"
   }
 ];
 

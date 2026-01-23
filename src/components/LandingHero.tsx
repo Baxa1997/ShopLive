@@ -38,12 +38,12 @@ import MagicTextTransform from '@/components/MagicTextTransform';
 export default function LandingHero() {
   return (
     <section className="relative pt-24 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[90vh] flex flex-col justify-center">
-      {/* Magic Text Transform Animation */}
+
       <MagicTextTransform />
 
       <nav className="absolute top-0 left-0 w-full p-6 z-20">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-            {/* Logo */}
+
             <div className="flex items-center gap-2">
                  <div className="bg-white/80 p-2 rounded-lg backdrop-blur-md border border-emerald-500/10 shadow-sm">
                     <Package className="w-5 h-5 text-emerald-600" />
@@ -55,12 +55,12 @@ export default function LandingHero() {
       </nav>
 
 
-      <div className="max-w-4xl mx-auto text-center relative z-10 mb-2">
+      <div className="max-w-6xl mx-auto text-center relative z-10 mb-2">
         <motion.div
            initial={{ opacity: 0, y: 20 }}
            animate={{ opacity: 1, y: 0 }}
            transition={{ duration: 0.5 }}
-           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/5 text-emerald-700 font-medium text-sm mb-8 border border-emerald-500/10 backdrop-blur-sm"
+           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/5 text-emerald-700 font-medium text-sm mb-4 border border-emerald-500/10 backdrop-blur-sm"
         >
           <Sparkles className="w-4 h-4" />
           <span>New Tools Added Weekly</span>
@@ -70,7 +70,7 @@ export default function LandingHero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
-          className="text-4xl md:text-7xl font-heading font-extrabold text-slate-900 tracking-tight mb-6 leading-[1.1]"
+          className="text-xl md:text-6xl font-heading font-extrabold text-slate-900 tracking-tight mb-6 leading-[1.1]"
         >
           From Supplier PDF <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-500 to-orange-500">
@@ -78,26 +78,26 @@ export default function LandingHero() {
           </span>
         </motion.h1>
 
-        <motion.p 
+        {/* <motion.p 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed font-body"
+          className="text-xl text-slate-500 max-w-4xl mx-auto mb-4 leading-relaxed font-body"
         >
           Stop manual data entry. Upload any supplier PDF or image, and our Architect engine generates structured Shopify CSVs and Amazon Inventory Files instantly.
-        </motion.p>
+        </motion.p> */}
         
         <motion.div
            initial={{ opacity: 0, y: 20 }}
            animate={{ opacity: 1, y: 0 }}
            transition={{ delay: 0.3, duration: 0.5 }}
-           className="flex justify-center mb-16"
+           className="flex justify-center mb-10"
         >
             <Link 
               href="/tools/multi-importer" 
               className="group inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-emerald-600 rounded-full hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-500/30 transform hover:-translate-y-1"
             >
-              Start Importing Now — It's Free
+              Start Importing Now
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
         </motion.div>
@@ -114,7 +114,7 @@ export default function LandingHero() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + index * 0.05 }}
                 className={cn(
-                  "group relative h-auto min-h-[22rem] rounded-[2rem] p-8 bg-white border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col justify-between transition-all duration-150",
+                  "group relative h-auto min-h-[20rem] rounded-[2rem] p-6 bg-white border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col justify-between transition-all duration-150",
                   isComingSoon ? "cursor-default opacity-80" : "cursor-pointer"
                 )}
               >
@@ -147,12 +147,12 @@ export default function LandingHero() {
                 </div>
 
                 <div className="relative z-10 flex items-end justify-between">
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     <p className="text-slate-500 font-medium text-sm max-w-[80%]">
                       {box.description}
                     </p>
                     {box.label === 'PDF to Multi-Channel Tool' && (
-                      <div className="mt-4 space-y-3">
+                      <div className="space-y-2">
                         <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
                           <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">
                             <FileText className="w-4 h-4" />

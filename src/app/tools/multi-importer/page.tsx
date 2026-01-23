@@ -118,8 +118,8 @@ export default function ShopifyImporterPage() {
   };
 
   const handleAnalyze = async () => {
-    if (usageCount >= 10) {
-      alert("Daily Limit Reached (10/10). Please come back tomorrow!");
+    if (usageCount >= 5) {
+      alert("Daily Limit Reached (5/5). Please come back tomorrow!");
       return;
     }
 
@@ -547,7 +547,7 @@ Service 5: Technical Readiness Audit (Validation)
         </Link>
       </div>
 
-      <header className="mb-4 text-center max-w-4xl mx-auto pt-10 relative">
+      <header className="mb-4 text-center max-w-6xl mx-auto pt-10 relative">
         <div className="flex items-center justify-center gap-6 md:gap-12 mb-4">
           <div className="hidden md:flex flex-col items-center gap-1 transition-opacity">
             <div className="w-12 h-12 bg-[#95BF47] rounded-xl flex items-center justify-center shadow-lg transform -rotate-12">
@@ -557,7 +557,7 @@ Service 5: Technical Readiness Audit (Validation)
           </div>
 
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight flex items-center justify-center gap-3">
-            <span className="text-emerald-600">Unified</span> Multi-Channel Importer
+            <span className="text-emerald-600">PDF</span> to Amazon & Shopify Generator
           </h1>
 
           <div className="hidden md:flex flex-col items-center gap-1 transition-opacity">
@@ -690,12 +690,12 @@ Service 5: Technical Readiness Audit (Validation)
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" /> Start Unified Sync
+                    <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" /> Generate Listing Files
                   </>
                 )}
               </button>
               <div className="text-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Limit: {10 - usageCount} syncs remaining today</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest"> {5 - usageCount} PDF Architectures remaining </span>
               </div>
             </div>
           </div>
