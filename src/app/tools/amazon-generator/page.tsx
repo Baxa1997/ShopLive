@@ -158,7 +158,7 @@ export default function AmazonGeneratorPage() {
             <button 
                 onClick={handleGenerate}
                 disabled={isLoading || !formData.productName}
-                className="w-full py-5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-lg hover:shadow-orange-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xl active:scale-[0.98] group"
+                className="w-full cursor-pointer py-5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-lg hover:shadow-orange-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xl active:scale-[0.98] group"
             >
                 {isLoading ? (
                     <>

@@ -8,6 +8,7 @@ import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
+import { PDFDocument } from 'pdf-lib';
 
 interface MasterArchitectVariant {
   sku: string;
@@ -117,132 +118,127 @@ export default function ShopifyImporterPage() {
     }
   };
 
-  const handleAnalyze = async () => {
-    if (usageCount >= 5) {
-      alert("Daily Limit Reached (5/5). Please come back tomorrow!");
-      return;
-    }
+  const extractData = async (file: File | Blob, apiKey: string): Promise<UnifiedProduct[]> => {
+    const genAI = new GoogleGenerativeAI(apiKey);
 
-    setIsLoading(true);
-    setError('');
-    
-    try {
-      if (!process.env.NEXT_PUBLIC_GOOGLE_API_KEY) {
-        throw new Error('API key not configured.');
-      }
-
-      if (uploadedFile && (uploadedFile.type.includes('image') || uploadedFile.type.includes('pdf'))) {
-        
-        const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GOOGLE_API_KEY);
-
-        const schema = {
-          type: SchemaType.ARRAY,
-          items: {
+    const schema = {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          sync_id: { type: SchemaType.STRING },
+          success_feedback: {
             type: SchemaType.OBJECT,
             properties: {
-              sync_id: { type: SchemaType.STRING },
-              success_feedback: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  total_variants: { type: SchemaType.NUMBER },
-                  channels_ready: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING }
-                  },
-                  summary_message: { type: SchemaType.STRING }
-                },
-                required: ["total_variants", "channels_ready", "summary_message"]
+              total_variants: { type: SchemaType.NUMBER },
+              channels_ready: {
+                type: SchemaType.ARRAY,
+                items: { type: SchemaType.STRING }
               },
-              shopify_service: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  handle: { type: SchemaType.STRING },
-                  title: { type: SchemaType.STRING },
-                  html_description: { type: SchemaType.STRING },
-                  tags: { type: SchemaType.STRING },
-                  vendor: { type: SchemaType.STRING },
-                  product_type: { type: SchemaType.STRING },
-                  variants: {
-                    type: SchemaType.ARRAY,
-                    items: {
-                      type: SchemaType.OBJECT,
-                      properties: {
-                        sku: { type: SchemaType.STRING },
-                        price: { type: SchemaType.STRING },
-                        option1_name: { type: SchemaType.STRING },
-                        option1_value: { type: SchemaType.STRING },
-                        grams: { type: SchemaType.NUMBER },
-                        inventory_qty: { type: SchemaType.NUMBER },
-                      }
-                    }
-                  }
-                },
-                required: ["handle", "title", "html_description", "tags", "vendor", "product_type", "variants"]
-              },
-              amazon_fba_service: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  flat_file_data: {
-                    type: SchemaType.OBJECT,
-                    properties: {
-                      item_name: { type: SchemaType.STRING },
-                      item_type_keyword: { type: SchemaType.STRING },
-                      feed_product_type: { type: SchemaType.STRING },
-                      brand_name: { type: SchemaType.STRING },
-                      standard_price: { type: SchemaType.STRING },
-                      bullets: {
-                        type: SchemaType.ARRAY,
-                        items: { type: SchemaType.STRING }
-                      }
-                    }
-                  },
-                  search_terms: { type: SchemaType.STRING },
-                  rufus_summary: { type: SchemaType.STRING }
-                },
-                required: ["flat_file_data", "search_terms", "rufus_summary"]
-              },
-              aplus_content_service: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  modules: {
-                    type: SchemaType.ARRAY,
-                    items: {
-                      type: SchemaType.OBJECT,
-                      properties: {
-                        header: { type: SchemaType.STRING },
-                        body: { type: SchemaType.STRING }
-                      }
-                    }
-                  },
-                  image_alt_text: { type: SchemaType.STRING }
-                }
-              },
-              readiness_report: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  status: { type: SchemaType.STRING },
-                  missing_fields: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING }
+              summary_message: { type: SchemaType.STRING }
+            },
+            required: ["total_variants", "channels_ready", "summary_message"]
+          },
+          shopify_service: {
+            type: SchemaType.OBJECT,
+            properties: {
+              handle: { type: SchemaType.STRING },
+              title: { type: SchemaType.STRING },
+              html_description: { type: SchemaType.STRING },
+              tags: { type: SchemaType.STRING },
+              vendor: { type: SchemaType.STRING },
+              product_type: { type: SchemaType.STRING },
+              variants: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    sku: { type: SchemaType.STRING },
+                    price: { type: SchemaType.STRING },
+                    option1_name: { type: SchemaType.STRING },
+                    option1_value: { type: SchemaType.STRING },
+                    grams: { type: SchemaType.NUMBER },
+                    inventory_qty: { type: SchemaType.NUMBER },
                   }
                 }
               }
             },
-            required: ["sync_id", "shopify_service", "amazon_fba_service", "aplus_content_service", "readiness_report"]
-          }
-        };
-
-        const model = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash",
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: schema as any,
+            required: ["handle", "title", "html_description", "tags", "vendor", "product_type", "variants"]
           },
-        });
+          amazon_fba_service: {
+            type: SchemaType.OBJECT,
+            properties: {
+              flat_file_data: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  item_name: { type: SchemaType.STRING },
+                  item_type_keyword: { type: SchemaType.STRING },
+                  feed_product_type: { type: SchemaType.STRING },
+                  brand_name: { type: SchemaType.STRING },
+                  standard_price: { type: SchemaType.STRING },
+                  bullets: {
+                    type: SchemaType.ARRAY,
+                    items: { type: SchemaType.STRING }
+                  }
+                }
+              },
+              search_terms: { type: SchemaType.STRING },
+              rufus_summary: { type: SchemaType.STRING }
+            },
+            required: ["flat_file_data", "search_terms", "rufus_summary"]
+          },
+          aplus_content_service: {
+            type: SchemaType.OBJECT,
+            properties: {
+              modules: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    header: { type: SchemaType.STRING },
+                    body: { type: SchemaType.STRING }
+                  }
+                }
+              },
+              image_alt_text: { type: SchemaType.STRING }
+            }
+          },
+          readiness_report: {
+            type: SchemaType.OBJECT,
+            properties: {
+              status: { type: SchemaType.STRING },
+              missing_fields: {
+                type: SchemaType.ARRAY,
+                items: { type: SchemaType.STRING }
+              }
+            }
+          }
+        },
+        required: ["sync_id", "shopify_service", "amazon_fba_service", "aplus_content_service", "readiness_report"]
+      }
+    };
 
-        const imagePart = await fileToGenerativePart(uploadedFile);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: schema as any,
+      },
+    });
 
-        const prompt = `Role: You are the "ShopsReady" Master Architect. Your task is to extract product data and transform it into a 100% compliant, synchronized data structure for 5 distinct seller services.
+    // Handle File or Blob casting for fileToGenerativePart
+    // If it's a Blob, we might need to cast it or wrap it in a File object if possible, 
+    // or ensure fileToGenerativePart accepts Blobs. 
+    // fileToGenerativePart reads with FileReader which works on Blobs too.
+    const imagePart = await fileToGenerativePart(file as File);
+
+    const prompt = `Role: You are the "ShopsReady" Master Architect acting as a Data Normalizer. Your goal is to extract attributes into a strictly structured format compatible with our current JSON schema.
+
+DATA NORMALIZATION RULES:
+1. Standardize Units: If you detect 'cm' or 'kg', convert them to the marketplace standard (e.g., US: inches/lbs).
+2. Clean Variations: Strip non-essential text from sizes (e.g., 'Size: 10/12 Kids' becomes '10/12' in option1_value).
+3. Industry Specifics: Identify technical specs like 'Voltage' or 'Material'. Do not leave them in the description; map them to 'tags' and 'bullets'.
+4. Amazon Compliance: Assign the most relevant 'item_type_keyword' based on the product category.
 
 The 5 Logic Layers to Implement:
 
@@ -274,21 +270,87 @@ Service 5: Technical Readiness Audit (Validation)
 - Identify missing data (e.g., UPC barcodes).
 - Provide a 250-byte backend search term string (no commas, no repetitions).`;
 
-        const result = await model.generateContent([prompt, imagePart]);
-        const response = await result.response;
-        const text = response.text();
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    const text = response.text();
 
-        const parsedProducts = JSON.parse(text);
+    const parsedProducts = JSON.parse(text);
 
-        if (!Array.isArray(parsedProducts)) {
-            throw new Error("Invalid response format from AI");
+    if (!Array.isArray(parsedProducts)) {
+        throw new Error("Invalid response format from AI");
+    }
+
+    return parsedProducts;
+  };
+
+  const handleAnalyze = async () => {
+    if (usageCount >= 5) {
+      alert("Daily Limit Reached (5/5). Please come back tomorrow!");
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      if (!process.env.NEXT_PUBLIC_GOOGLE_API_KEY) {
+        throw new Error('API key not configured.');
+      }
+
+      if (uploadedFile && uploadedFile.type === 'application/pdf') {
+        const arrayBuffer = await uploadedFile.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        const totalPages = pdfDoc.getPageCount();
+        const batchSize = 10;
+        
+        let hasProcessedAtLeastOne = false;
+
+        for (let i = 0; i < totalPages; i += batchSize) {
+          const subDoc = await PDFDocument.create();
+          const pageIndices = [];
+          for (let j = 0; j < batchSize && (i + j) < totalPages; j++) {
+            pageIndices.push(i + j);
+          }
+          
+          const copiedPages = await subDoc.copyPages(pdfDoc, pageIndices);
+          copiedPages.forEach((page: any) => subDoc.addPage(page));
+          
+          const pdfBytes = await subDoc.save();
+          // Create a Blob but cast/treat as File for extractData which uses FileReader
+          const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
+          const fileChunk = new File([blob], `chunk_${i}.pdf`, { type: 'application/pdf' });
+
+          try {
+            const chunkProducts = await extractData(fileChunk, process.env.NEXT_PUBLIC_GOOGLE_API_KEY);
+            setProducts(prev => [...prev, ...chunkProducts]);
+            hasProcessedAtLeastOne = true;
+          } catch (chunkErr) {
+            console.error(`Error processing chunk ${i}-${i+batchSize}:`, chunkErr);
+            // We continue processing other chunks even if one fails
+          }
+
+          // Non-blocking delay
+          await new Promise(r => setTimeout(r, 200));
         }
+        
+        if (hasProcessedAtLeastOne) {
+          const newCount = usageCount + 1;
+          setUsageCount(newCount);
+          localStorage.setItem('import_count', newCount.toString());
+          setCurrentStep(2);
+        } else {
+           throw new Error("Failed to process any pages in the PDF.");
+        }
+
+      } else if (uploadedFile && uploadedFile.type.includes('image')) {
+        
+        const products = await extractData(uploadedFile, process.env.NEXT_PUBLIC_GOOGLE_API_KEY);
 
         const newCount = usageCount + 1;
         setUsageCount(newCount);
         localStorage.setItem('import_count', newCount.toString());
 
-        setProducts(parsedProducts);
+        setProducts(products);
         setCurrentStep(2);
 
       } else {
@@ -682,7 +744,7 @@ Service 5: Technical Readiness Audit (Validation)
               <button
                 onClick={handleAnalyze}
                 disabled={isLoading || (inputTab === 'upload' ? !fileName : !inputText.trim())}
-                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl shadow-xl hover:shadow-slate-200 shadow-slate-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg group"
+                className="w-full cursor-pointer py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl shadow-xl hover:shadow-slate-200 shadow-slate-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg group"
               >
                 {isLoading ? (
                   <>
