@@ -24,10 +24,9 @@ export default function RootLayout({
     <html lang="en">
       <head>
 
-        <title>ShopsReady | AI PDF to Shopify CSV & Amazon FBA Flat File Generator</title>
-        <meta name="description" content="Stop manual data entry. Convert supplier PDFs to Shopify CSV and Amazon FBA listings instantly. Optimized for Rufus AI, A+ Content, and multi-channel SKU sync." />
-        
-        <meta name="keywords" content="Shopify product importer, Amazon FBA flat file generator, PDF to Shopify CSV converter, bulk product listing tool, automate shopify catalog, amazon inventory loader automation, dropshipping supplier pdf converter, convert catalog to csv, amazon rufus seo tool, multi-channel product sync, wholesale pdf to shopify, ecommerce data mapping tool, automated product descriptions, FBA inventory loader tool, shopsready, amazon fba, fba, amazon, shops ready, shopsready.com" />
+        <title>ShopsReady | PDF to CSV & Shopify CSV Generator</title>
+        <meta name="description" content="ShopsReady: The fastest way to CSV generate for Shopify and Amazon. Use our AI PDF to CSV tool to automate your e-commerce onboarding in seconds." />
+        <meta name="keywords" content="ShopsReady, PDF to CSV, Shopify CSV generator, CSV generate, Amazon inventory" />
         <meta name="author" content="ShopsReady Team" />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://shopsready.com" />

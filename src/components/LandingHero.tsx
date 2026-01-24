@@ -10,7 +10,7 @@ const CATEGORY_BOXES: { label: string; icon: any; description: string; color: st
   { 
     label: 'PDF to Multi-Channel Tool', 
     icon: Package, 
-    description: 'Convert messy supplier catalogs into platform-ready files.',
+    description: '',
     color: 'from-emerald-600 to-orange-500',
     href: '/tools/multi-importer',
     badge: 'New & Improved'
@@ -60,7 +60,7 @@ export default function LandingHero() {
            initial={{ opacity: 0, y: 20 }}
            animate={{ opacity: 1, y: 0 }}
            transition={{ duration: 0.5 }}
-           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/5 text-emerald-700 font-medium text-sm mb-4 border border-emerald-500/10 backdrop-blur-sm"
+           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/5 text-emerald-700 font-medium text-sm mb-2 border border-emerald-500/10 backdrop-blur-sm"
         >
           <Sparkles className="w-4 h-4" />
           <span>New Tools Added Weekly</span>
@@ -70,28 +70,28 @@ export default function LandingHero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
-          className="text-xl md:text-6xl font-heading font-extrabold text-slate-900 tracking-tight mb-6 leading-[1.1]"
+          className="text-xl md:text-6xl font-heading font-extrabold text-slate-900 tracking-tight mb-4 leading-[1.1]"
         >
-          From Supplier PDF <br />
+          ShopsReady: Advanced <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-500 to-orange-500">
-            to Shopify & Amazon in 60 Seconds.
+            PDF to CSV for E-commerce
           </span>
         </motion.h1>
 
-        {/* <motion.p 
+        <motion.p 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="text-xl text-slate-500 max-w-4xl mx-auto mb-4 leading-relaxed font-body"
+          className="text-lg text-slate-500 max-w-8xl mx-auto mb-8 leading-relaxed font-body"
         >
-          Stop manual data entry. Upload any supplier PDF or image, and our Architect engine generates structured Shopify CSVs and Amazon Inventory Files instantly.
-        </motion.p> */}
+          Stop manual data entry. Our <strong>Shopify CSV generator</strong> lets you <strong>CSV generate</strong> directly from supplier catalogs. Whether you need a simple <strong>PDF to CSV</strong> conversion or a complex Amazon inventory file, ShopsReady is the tool for you.
+        </motion.p>
         
         <motion.div
            initial={{ opacity: 0, y: 20 }}
            animate={{ opacity: 1, y: 0 }}
            transition={{ delay: 0.3, duration: 0.5 }}
-           className="flex justify-center mb-10"
+           className="flex justify-center mb-6"
         >
             <Link 
               href="/tools/multi-importer" 
@@ -148,9 +148,9 @@ export default function LandingHero() {
 
                 <div className="relative z-10 flex items-end justify-between">
                   <div className="space-y-2">
-                    <p className="text-slate-500 font-medium text-sm max-w-[80%]">
+                   {box.description && <p className="text-slate-500 font-medium text-sm max-w-[80%]">
                       {box.description}
-                    </p>
+                    </p>}
                     {box.label === 'PDF to Multi-Channel Tool' && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">

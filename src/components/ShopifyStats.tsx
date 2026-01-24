@@ -6,7 +6,7 @@ import { ShoppingCart, Users, Package, TrendingUp } from 'lucide-react';
 const STATS = [
   {
     label: 'Orders Completed',
-    value: '300+',
+    value: '30+',
     icon: ShoppingCart,
     color: 'text-blue-600',
     bgColor: 'bg-blue-50',
@@ -14,7 +14,7 @@ const STATS = [
   },
   {
     label: 'Daily Clients',
-    value: '100+',
+    value: '20+',
     icon: Users,
     color: 'text-emerald-600',
     bgColor: 'bg-emerald-50',
@@ -22,7 +22,7 @@ const STATS = [
   },
   {
     label: 'Products Added Daily',
-    value: '200+',
+    value: '10',
     icon: Package,
     color: 'text-orange-600',
     bgColor: 'bg-orange-50',
