@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag } from 'lucide-react';
+import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
@@ -33,6 +33,7 @@ interface UnifiedProduct {
     tags: string;
     vendor: string;
     product_type: string;
+    google_product_category: string;
     seo_title: string;
     seo_description: string;
     variants: MasterArchitectVariant[];
@@ -89,6 +90,15 @@ export default function ShopifyImporterPage() {
   const [usageCount, setUsageCount] = useState(0);
   const [inputTab, setInputTab] = useState<'upload' | 'manual'>('upload');
 
+  // Advanced Configuration State
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [userConfig, setUserConfig] = useState({
+    defaultQty: 100,
+    priceMarkup: 1.0,
+    defaultType: 'General Merchandise'
+  });
+  const [isConfigConfirmed, setIsConfigConfirmed] = useState(false);
+
   useEffect(() => {
     const today = new Date().toDateString();
     const savedDate = localStorage.getItem('import_usage_date');
@@ -120,7 +130,7 @@ export default function ShopifyImporterPage() {
     }
   };
 
-  const extractData = async (file: File | Blob, apiKey: string): Promise<UnifiedProduct[]> => {
+  const extractData = async (file: File | Blob, apiKey: string, config: typeof userConfig, isConfigConfirmed: boolean): Promise<UnifiedProduct[]> => {
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const schema = {
@@ -150,6 +160,7 @@ export default function ShopifyImporterPage() {
               tags: { type: SchemaType.STRING },
               vendor: { type: SchemaType.STRING },
               product_type: { type: SchemaType.STRING },
+              google_product_category: { type: SchemaType.STRING },
               seo_title: { type: SchemaType.STRING },
               seo_description: { type: SchemaType.STRING },
               variants: {
@@ -167,7 +178,7 @@ export default function ShopifyImporterPage() {
                 }
               }
             },
-            required: ["handle", "title", "html_description", "tags", "vendor", "product_type", "seo_title", "seo_description", "variants"]
+            required: ["handle", "title", "html_description", "tags", "vendor", "product_type", "google_product_category", "seo_title", "seo_description", "variants"]
           },
           amazon_fba_service: {
             type: SchemaType.OBJECT,
@@ -236,42 +247,42 @@ export default function ShopifyImporterPage() {
     // fileToGenerativePart reads with FileReader which works on Blobs too.
     const imagePart = await fileToGenerativePart(file as File);
 
-    const prompt = `Act as a Senior E-commerce Data Architect.
+    const prompt = `Act as a Senior E-commerce Data Architect for the ShopsReady Platform. 
 
-1. Data Mirror:
-- Extract prices 1:1. Locate the 'Price' or 'Wholesale Price' in the document.
-- Zero Math: Do NOT multiply, markup, or perform any currency conversions. If the document says '9.90', output '9.90'.
-- Zero Symbols: Output the price as a clean number. Do NOT include currency symbols ($, UZS, etc.).
+Goal: Transform a supplier PDF into a high-integrity, multi-channel Shopify/Amazon CSV. You must prioritize dynamic extraction from the document while using the following fallback configurations ONLY when 'Config Confirmed' is true:
+- Fallback Quantity: ${config.defaultQty}
+- Fallback Product Type: ${config.defaultType}
+- Price Multiplier: ${config.priceMarkup}
+- Config Status: ${isConfigConfirmed}
 
-2. Safe Labeling:
-- Product Type (Shopify 'Type'): Put the exact category name found in the PDF here (e.g., 'Leather Goods').
-- Product Category: This field is now strictly handled by our backend architecture. Do not attempt to map or standardise it in the shopify_service object.
+1. Intelligent Price & Wholesale Extraction:
+- Primary Source: Search the PDF for 'Wholesale', 'Wholesale Price', 'Cost', or numerical values aligned with product names.
+- Logic: 
+    - IF price is found: Extract the raw number. THEN, if Config Status is true, multiply by ${config.priceMarkup}.
+    - IF price is NOT found: If Config Status is true, use a default of 0.
+- Strict Rule: Always output a numerical value. If no price can be determined, output '0' (never leave it empty).
+- Format: Clean number, rounded to 2 decimal places, no currency symbols.
 
-3. Professional Content:
-- SEO Titles & Descriptions: Generate professional, search-optimized 'seo_title' and 'seo_description' based on the product's technical specifications.
-- A+ Storytelling: Generate high-end branding modules (The Craft, The Experience, The Trust) for Amazon registry.
+2. Dynamic Industry & Category Detection:
+- Priority 1 (AI Detection): Identify the product industry (e.g., 'Candle', 'Tote Bag') from the PDF text. 
+- Mapping: Dynamically map the product to the closest 'Standard Shopify Product Category' breadcrumb (e.g., 'Home & Garden > Home Fragrances > Candles').
+- Priority 2 (Fallback): IF industry detection fails AND Config Status is true, use: ${config.defaultType}.
 
-The 5 Logic Layers to Implement:
+3. Conditional Inventory Logic:
+- Extraction: Look for 'Stock', 'Inventory', or 'Qty' in the PDF.
+- Fallback: IF missing AND Config Status is true, use ${config.defaultQty}. 
+- Error State: If missing and Config Status is false, output '0'.
 
-Service 1: Technical Amazon Flat File (Operational)
-- Map data to exact Amazon headers. item_name should be SEO-optimized. bullets: 5 distinct benefits starting with BOLD CAPS. sync_id: [Brand]-[Model]-[First Letter of Color/Size].
+4. Multi-Channel Synchronization Layers:
+- Service 1 (Amazon): Map exact headers. item_name (150+ chars), 5 bullet points (BOLD CAPS starts), and unique sync_id ([Brand]-[Model]-[Variant]).
+- Service 2 (Shopify): Create unique handle, HTML description (<strong>, <li>), and ensure SKU matches the sync_id for inventory tracking.
+- Service 3 (A+ Content): Generate 3 branding modules: The Craft, The Experience, The Trust.
+- Service 4 (Rufus AI): Write a 100-word conversational summary for AI-search optimization.
 
-Service 6: Success Feedback (The Comfort Layer)
-- Provide a 3-sentence summary_message highlighting the 1:1 price integrity and multi-channel readiness.
+5. Success Feedback:
+- summary_message: Provide a 3-sentence summary highlighting the extraction success, detected industry, and whether fallback configs were applied.
 
-Service 2: Shopify Multi-Channel Sync (Marketing)
-- handle: unique slug. html_description: <strong> and <li> tags. variants: 1:1 price mirror. seo_title / seo_description: senior-level generation.
-
-Service 3: A+ Content Storytelling (Enhanced Branding)
-- Generate 3 modules: materials, benefits, quality guarantee.
-
-Service 4: AI-Search (Rufus) Optimization (Modern SEO)
-- Write a 100-word Semantic Summary for conversational search.
-
-Service 5: Technical Readiness Audit (Validation)
-- Identify missing fields like UPC barcodes.
-
-Output: Return ONLY valid JSON following the schema.`;
+Output: Return ONLY a valid JSON object. No conversational text.`;
 
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
@@ -323,7 +334,7 @@ Output: Return ONLY valid JSON following the schema.`;
           const fileChunk = new File([blob], `chunk_${i}.pdf`, { type: 'application/pdf' });
 
           try {
-            const chunkProducts = await extractData(fileChunk, process.env.NEXT_PUBLIC_GOOGLE_API_KEY);
+            const chunkProducts = await extractData(fileChunk, process.env.NEXT_PUBLIC_GOOGLE_API_KEY, userConfig, isConfigConfirmed);
             setProducts(prev => [...prev, ...chunkProducts]);
             hasProcessedAtLeastOne = true;
           } catch (chunkErr) {
@@ -344,7 +355,7 @@ Output: Return ONLY valid JSON following the schema.`;
 
       } else if (uploadedFile && uploadedFile.type.includes('image')) {
         
-        const products = await extractData(uploadedFile, process.env.NEXT_PUBLIC_GOOGLE_API_KEY);
+        const products = await extractData(uploadedFile, process.env.NEXT_PUBLIC_GOOGLE_API_KEY, userConfig, isConfigConfirmed);
 
         const newCount = usageCount + 1;
         setUsageCount(newCount);
@@ -370,6 +381,7 @@ Output: Return ONLY valid JSON following the schema.`;
               tags: 'denim, jacket, men fashion, rugged',
               vendor: 'Urban Threads',
               product_type: 'Outerwear',
+              google_product_category: 'Apparel & Accessories > Clothing > Outerwear > Coats & Jackets',
               seo_title: 'Urban Threads Rugged Denim Jacket - Premium Navy Outerwear',
               seo_description: 'Upgrade your style with the Urban Threads Rugged Denim Jacket. Featuring 14oz reinforced denim and double-stitched seams for maximum durability.',
               variants: [
@@ -453,7 +465,7 @@ Output: Return ONLY valid JSON following the schema.`;
 
   const generateCSV = () => {
     const headers = [
-      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Product Category', 'Tags', 'Published',
+      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Google Product Category', 'Tags', 'Published',
       'Option1 Name', 'Option1 Value', 'Variant Price', 'Variant Grams', 
       'Variant Inventory Tracker', 'Variant Inventory Qty', 'Variant SKU', 'SEO Title', 'SEO Description'
     ];
@@ -467,7 +479,7 @@ Output: Return ONLY valid JSON following the schema.`;
           p.shopify_service.html_description,
           p.shopify_service.vendor,
           p.shopify_service.product_type, // Exact category name from PDF
-          '', // Product Category (Leave blank for polar/pilot)
+          p.shopify_service.google_product_category, // Standard Category
           p.shopify_service.tags,
           'TRUE', 
           v.option1_name,
@@ -743,24 +755,38 @@ Output: Return ONLY valid JSON following the schema.`;
               </div>
             )}
 
-            <div className="mt-2 pt-2 border-t border-slate-100 space-y-4">
-              <button
-                onClick={handleAnalyze}
-                disabled={isLoading || (inputTab === 'upload' ? !fileName : !inputText.trim())}
-                className="w-full cursor-pointer py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl shadow-xl hover:shadow-slate-200 shadow-slate-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg group"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> Analyzing Everything...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" /> Generate Listing Files
-                  </>
-                )}
-              </button>
-              <div className="text-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest"> {5 - usageCount} PDF Architectures remaining </span>
+            <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-6">
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsConfigModalOpen(true)}
+                  className="px-4 cursor-pointer bg-white border-2 border-slate-200 text-slate-600 rounded-2xl hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center group relative overflow-hidden "
+                  title="Advanced Configurations"
+                >
+                  <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
+                  <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
+                </button>
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isLoading || (inputTab === 'upload' ? !fileName : !inputText.trim())}
+                  className="flex-1 cursor-pointer py-4 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-3xl shadow-2xl shadow-slate-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-4 text-xl group"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-6 h-6 animate-spin" /> Architecting...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" /> Generate Listing Files
+                    </>
+                  )}
+                </button>
+              </div>
+              
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 rounded-full border border-[red]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-green uppercase tracking-[0.2em]"> {5 - usageCount} PDF Architectures remaining </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1191,6 +1217,89 @@ Output: Return ONLY valid JSON following the schema.`;
         )}
 
       </main>
+
+      {/* Advanced Config Modal */}
+      {isConfigModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsConfigModalOpen(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden transform animate-in zoom-in-95 duration-300">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
+                    <Settings className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 leading-tight">Safety Net Settings</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Global Fallbacks & AI Rules</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsConfigModalOpen(false)}
+                  className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+
+              <div className="space-y-5">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase ml-1 flex items-center gap-2">
+                    Default Inventory Level <Tag className="w-3 h-3" />
+                  </label>
+                  <input
+                    type="number"
+                    value={userConfig.defaultQty}
+                    onChange={(e) => setUserConfig(prev => ({ ...prev, defaultQty: Number(e.target.value) }))}
+                    className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white text-sm font-bold text-slate-900 outline-none transition-all shadow-inner"
+                    placeholder="e.g. 100"
+                  />
+                  <p className="text-[9px] text-slate-400 ml-1 italic">Used if stock detection fails in PDF</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase ml-1 flex items-center gap-2">
+                    Bulk Price Markup <Sparkles className="w-3 h-3" />
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={userConfig.priceMarkup}
+                    onChange={(e) => setUserConfig(prev => ({ ...prev, priceMarkup: Number(e.target.value) }))}
+                    className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white text-sm font-bold text-slate-900 outline-none transition-all shadow-inner"
+                    placeholder="e.g. 1.2 for 20% markup"
+                  />
+                  <p className="text-[9px] text-slate-400 ml-1 italic">Source Price * Markup (1.0 = 1:1 Mirror)</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase ml-1 flex items-center gap-2">
+                    Standard Fallback Type <ShoppingBag className="w-3 h-3" />
+                  </label>
+                  <input
+                    type="text"
+                    value={userConfig.defaultType}
+                    onChange={(e) => setUserConfig(prev => ({ ...prev, defaultType: e.target.value }))}
+                    className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white text-sm font-bold text-slate-900 outline-none transition-all shadow-inner"
+                    placeholder="e.g. General Merchandise"
+                  />
+                  <p className="text-[12px] text-[red] ml-1 italic">Classification used if PDF is generic</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsConfigConfirmed(true);
+                  setIsConfigModalOpen(false);
+                }}
+                className="w-full cursor-pointer mt-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+              >
+                <Check className="w-5 h-5" /> Apply Fallbacks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
