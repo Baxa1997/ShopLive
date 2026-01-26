@@ -232,13 +232,14 @@ export default function ShopifyImporterPage() {
     // fileToGenerativePart reads with FileReader which works on Blobs too.
     const imagePart = await fileToGenerativePart(file as File);
 
-    const prompt = `Role: You are the "ShopsReady" Master Architect acting as a Data Normalizer. Your goal is to extract attributes into a strictly structured format compatible with our current JSON schema.
+    const prompt = `Act as a Senior E-commerce Data Architect.
 
-DATA NORMALIZATION RULES:
-1. Standardize Units: If you detect 'cm' or 'kg', convert them to the marketplace standard (e.g., US: inches/lbs).
-2. Clean Variations: Strip non-essential text from sizes (e.g., 'Size: 10/12 Kids' becomes '10/12' in option1_value).
-3. Industry Specifics: Identify technical specs like 'Voltage' or 'Material'. Do not leave them in the description; map them to 'tags' and 'bullets'.
-4. Amazon Compliance: Assign the most relevant 'item_type_keyword' based on the product category.
+Goal: Extract product data from the attached PDF into a Shopify CSV with 1:1 source integrity.
+
+1. Strict Price & Currency Extraction:
+- Zero Calculations: Locate the 'Price' or 'Wholesale Price' in the PDF. Extract the numerical value exactly as it is written.
+- No Math: Do NOT multiply, markup, or perform any currency conversions. If the PDF says '9.90', the CSV 'price' column must be '9.90'.
+- Symbol Stripping: Output the price as a clean number. Do NOT include currency symbols ($, UZS, etc.) inside the JSON values.
 
 The 5 Logic Layers to Implement:
 
@@ -316,7 +317,6 @@ Service 5: Technical Readiness Audit (Validation)
           copiedPages.forEach((page: any) => subDoc.addPage(page));
           
           const pdfBytes = await subDoc.save();
-          // Create a Blob but cast/treat as File for extractData which uses FileReader
           const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
           const fileChunk = new File([blob], `chunk_${i}.pdf`, { type: 'application/pdf' });
 
@@ -326,10 +326,8 @@ Service 5: Technical Readiness Audit (Validation)
             hasProcessedAtLeastOne = true;
           } catch (chunkErr) {
             console.error(`Error processing chunk ${i}-${i+batchSize}:`, chunkErr);
-            // We continue processing other chunks even if one fails
           }
 
-          // Non-blocking delay
           await new Promise(r => setTimeout(r, 200));
         }
         
@@ -466,15 +464,15 @@ Service 5: Technical Readiness Audit (Validation)
           p.shopify_service.vendor,
           p.shopify_service.product_type,
           p.shopify_service.tags,
-          'TRUE', // published
+          'TRUE', 
           v.option1_name,
           v.option1_value,
           v.price,
           v.grams,
-          'shopify', // inventory tracker
+          'shopify',
           v.inventory_qty,
           v.sku,
-          '' // image_src placeholder
+          '' 
         ]);
       });
     });
@@ -544,10 +542,10 @@ Service 5: Technical Readiness Audit (Validation)
   const downloadMultiChannelPackage = async () => {
     const zip = new JSZip();
     
-    // 1. Shopify CSV
+
     zip.file('shopify_import.csv', generateCSV());
     
-    // 2. Amazon Listings (Text format)
+
     let amazonContent = "SHOPSREADY ARCHITECT - AMAZON FBA SYNC\n======================================\n\n";
     products.forEach(p => {
       amazonContent += `Product: ${p.shopify_service.title}\n`;
@@ -572,7 +570,6 @@ Service 5: Technical Readiness Audit (Validation)
     });
     zip.file('amazon_listings.txt', amazonContent);
 
-    // 3. Amazon Flat File (Excel)
     const excelBuffer = await generateAmazonFlatFile();
     zip.file('amazon_fba_flat_file.xlsx', excelBuffer);
     
