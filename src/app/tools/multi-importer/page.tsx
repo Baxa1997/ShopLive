@@ -33,6 +33,8 @@ interface UnifiedProduct {
     tags: string;
     vendor: string;
     product_type: string;
+    seo_title: string;
+    seo_description: string;
     variants: MasterArchitectVariant[];
   };
   amazon_fba_service: {
@@ -148,6 +150,8 @@ export default function ShopifyImporterPage() {
               tags: { type: SchemaType.STRING },
               vendor: { type: SchemaType.STRING },
               product_type: { type: SchemaType.STRING },
+              seo_title: { type: SchemaType.STRING },
+              seo_description: { type: SchemaType.STRING },
               variants: {
                 type: SchemaType.ARRAY,
                 items: {
@@ -163,7 +167,7 @@ export default function ShopifyImporterPage() {
                 }
               }
             },
-            required: ["handle", "title", "html_description", "tags", "vendor", "product_type", "variants"]
+            required: ["handle", "title", "html_description", "tags", "vendor", "product_type", "seo_title", "seo_description", "variants"]
           },
           amazon_fba_service: {
             type: SchemaType.OBJECT,
@@ -234,42 +238,40 @@ export default function ShopifyImporterPage() {
 
     const prompt = `Act as a Senior E-commerce Data Architect.
 
-Goal: Extract product data from the attached PDF into a Shopify CSV with 1:1 source integrity.
+1. Data Mirror:
+- Extract prices 1:1. Locate the 'Price' or 'Wholesale Price' in the document.
+- Zero Math: Do NOT multiply, markup, or perform any currency conversions. If the document says '9.90', output '9.90'.
+- Zero Symbols: Output the price as a clean number. Do NOT include currency symbols ($, UZS, etc.).
 
-1. Strict Price & Currency Extraction:
-- Zero Calculations: Locate the 'Price' or 'Wholesale Price' in the PDF. Extract the numerical value exactly as it is written.
-- No Math: Do NOT multiply, markup, or perform any currency conversions. If the PDF says '9.90', the CSV 'price' column must be '9.90'.
-- Symbol Stripping: Output the price as a clean number. Do NOT include currency symbols ($, UZS, etc.) inside the JSON values.
+2. Safe Labeling:
+- Product Type (Shopify 'Type'): Put the exact category name found in the PDF here (e.g., 'Leather Goods').
+- Product Category: This field is now strictly handled by our backend architecture. Do not attempt to map or standardise it in the shopify_service object.
+
+3. Professional Content:
+- SEO Titles & Descriptions: Generate professional, search-optimized 'seo_title' and 'seo_description' based on the product's technical specifications.
+- A+ Storytelling: Generate high-end branding modules (The Craft, The Experience, The Trust) for Amazon registry.
 
 The 5 Logic Layers to Implement:
 
 Service 1: Technical Amazon Flat File (Operational)
-- Map data to exact Amazon headers.
-- item_name: SEO-optimized (150-180 chars, keywords in first 80).
-- bullets: 5 distinct benefits starting with BOLD CAPS.
-- Generate a unique sync_id / seller_sku (Formula: [Brand]-[Model]-[First Letter of Color/Size]).
+- Map data to exact Amazon headers. item_name should be SEO-optimized. bullets: 5 distinct benefits starting with BOLD CAPS. sync_id: [Brand]-[Model]-[First Letter of Color/Size].
 
 Service 6: Success Feedback (The Comfort Layer)
-- Provide a 3-sentence summary_message for the user explaining exactly what has been generated (e.g., "Synthesized 1 product with 3 variants. Created 100% compliant FBA metadata and SEO Shopify content.").
-- List channels_ready (e.g., ["Shopify", "Amazon FBA"]).
+- Provide a 3-sentence summary_message highlighting the 1:1 price integrity and multi-channel readiness.
 
 Service 2: Shopify Multi-Channel Sync (Marketing)
-- Create a CSV-ready object with HTML <strong> and <li> tags.
-- Logic: Variant SKUs must EXTACLY match the sync_id for inventory synchronization.
+- handle: unique slug. html_description: <strong> and <li> tags. variants: 1:1 price mirror. seo_title / seo_description: senior-level generation.
 
 Service 3: A+ Content Storytelling (Enhanced Branding)
-- Generate 3 modules:
-  Module 1 (The Craft): Materials and origins.
-  Module 2 (The Experience): User benefits.
-  Module 3 (The Trust): Quality guarantee.
-- SEO "Alt-text" for primary product images.
+- Generate 3 modules: materials, benefits, quality guarantee.
 
 Service 4: AI-Search (Rufus) Optimization (Modern SEO)
-- Write a 100-word Semantic Summary in natural, conversational language answering common customer questions.
+- Write a 100-word Semantic Summary for conversational search.
 
 Service 5: Technical Readiness Audit (Validation)
-- Identify missing data (e.g., UPC barcodes).
-- Provide a 250-byte backend search term string (no commas, no repetitions).`;
+- Identify missing fields like UPC barcodes.
+
+Output: Return ONLY valid JSON following the schema.`;
 
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
@@ -368,6 +370,8 @@ Service 5: Technical Readiness Audit (Validation)
               tags: 'denim, jacket, men fashion, rugged',
               vendor: 'Urban Threads',
               product_type: 'Outerwear',
+              seo_title: 'Urban Threads Rugged Denim Jacket - Premium Navy Outerwear',
+              seo_description: 'Upgrade your style with the Urban Threads Rugged Denim Jacket. Featuring 14oz reinforced denim and double-stitched seams for maximum durability.',
               variants: [
                 {
                   sku: 'URB-DENIM-NAVY-M',
@@ -449,9 +453,9 @@ Service 5: Technical Readiness Audit (Validation)
 
   const generateCSV = () => {
     const headers = [
-      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Tags', 'Published',
+      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Product Category', 'Tags', 'Published',
       'Option1 Name', 'Option1 Value', 'Variant Price', 'Variant Grams', 
-      'Variant Inventory Tracker', 'Variant Inventory Qty', 'Variant SKU', 'Image Src'
+      'Variant Inventory Tracker', 'Variant Inventory Qty', 'Variant SKU', 'SEO Title', 'SEO Description'
     ];
     
     const rows: any[] = [];
@@ -462,7 +466,8 @@ Service 5: Technical Readiness Audit (Validation)
           p.shopify_service.title,
           p.shopify_service.html_description,
           p.shopify_service.vendor,
-          p.shopify_service.product_type,
+          p.shopify_service.product_type, // Exact category name from PDF
+          '', // Product Category (Leave blank for polar/pilot)
           p.shopify_service.tags,
           'TRUE', 
           v.option1_name,
@@ -472,7 +477,8 @@ Service 5: Technical Readiness Audit (Validation)
           'shopify',
           v.inventory_qty,
           v.sku,
-          '' 
+          p.shopify_service.seo_title,
+          p.shopify_service.seo_description
         ]);
       });
     });
@@ -850,6 +856,27 @@ Service 5: Technical Readiness Audit (Validation)
                               type="text"
                               value={product.shopify_service.product_type}
                               onChange={(e) => handleShopifyChange(pIdx, 'product_type', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 text-sm font-semibold text-slate-700 outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                           <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">SEO Title</label>
+                            <input
+                              type="text"
+                              value={product.shopify_service.seo_title}
+                              onChange={(e) => handleShopifyChange(pIdx, 'seo_title', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 text-sm font-semibold text-slate-700 outline-none"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">SEO Description</label>
+                            <input
+                              type="text"
+                              value={product.shopify_service.seo_description}
+                              onChange={(e) => handleShopifyChange(pIdx, 'seo_description', e.target.value)}
                               className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 text-sm font-semibold text-slate-700 outline-none"
                             />
                           </div>
