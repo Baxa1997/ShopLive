@@ -249,38 +249,41 @@ export default function ShopifyImporterPage() {
 
     const prompt = `Act as a Senior E-commerce Data Architect for the ShopsReady Platform. 
 
-Goal: Transform a supplier PDF into a high-integrity, multi-channel Shopify/Amazon CSV. You must prioritize dynamic extraction from the document while using the following fallback configurations ONLY when 'Config Confirmed' is true:
-- Fallback Quantity: ${config.defaultQty}
-- Fallback Product Type: ${config.defaultType}
-- Price Multiplier: ${config.priceMarkup}
+Goal: Extract product data from the PDF into a Shopify CSV with 1:1 source integrity, applying user-defined fallbacks ONLY when 'Config Status' is true.
+
+FALLBACK CONFIGURATIONS (Internal userConfig):
+- Default Quantity: ${config.defaultQty}
+- Price Markup: ${config.priceMarkup}
+- Default Product Type: ${config.defaultType}
 - Config Status: ${isConfigConfirmed}
 
-1. Intelligent Price & Wholesale Extraction:
-- Primary Source: Search the PDF for 'Wholesale', 'Wholesale Price', 'Cost', or numerical values aligned with product names.
-- Logic: 
-    - IF price is found: Extract the raw number. THEN, if Config Status is true, multiply by ${config.priceMarkup}.
-    - IF price is NOT found: If Config Status is true, use a default of 0.
-- Strict Rule: Always output a numerical value. If no price can be determined, output '0' (never leave it empty).
-- Format: Clean number, rounded to 2 decimal places, no currency symbols.
+1. Full-Auto Category Mapping (Safety First):
+- Primary Action: Identify the product's industry. Attempt to map it to the official 'Standard Shopify Product Category' breadcrumb (e.g., 'Home & Garden > Home Fragrances > Candles').
+- Confidence Rule: ONLY fill the 'google_product_category' column if you have high confidence in the exact Shopify taxonomy string. 
+- Safety Fallback: If unsure of the exact category string, leave the 'google_product_category' field BLANK. Instead, ensure the 'product_type' field is filled with a precise industry keyword (e.g., 'Scented Candle') to trigger Shopify's internal AI suggestions.
 
-2. Dynamic Industry & Category Detection:
-- Priority 1 (AI Detection): Identify the product industry (e.g., 'Candle', 'Tote Bag') from the PDF text. 
-- Mapping: Dynamically map the product to the closest 'Standard Shopify Product Category' breadcrumb (e.g., 'Home & Garden > Home Fragrances > Candles').
-- Priority 2 (Fallback): IF industry detection fails AND Config Status is true, use: ${config.defaultType}.
+2. Strategic Industry & Type Detection:
+- Logic: Always populate the 'product_type' field with the specific industry name detected in the PDF.
+- Purpose: This acts as the secondary trigger for Shopify's taxonomy engine and tax rules.
 
-3. Conditional Inventory Logic:
-- Extraction: Look for 'Stock', 'Inventory', or 'Qty' in the PDF.
-- Fallback: IF missing AND Config Status is true, use ${config.defaultQty}. 
-- Error State: If missing and Config Status is false, output '0'.
+3. Intelligent Price Extraction:
+- Primary Source: Search PDF for 'Wholesale', 'Wholesale Price', or 'Cost'.
+- Markup: IF price is found AND Config Status is true, multiply by ${config.priceMarkup}. Otherwise, output 1:1.
+- Strict Rule: Output '0' if no price is found. Never leave empty.
 
-4. Multi-Channel Synchronization Layers:
-- Service 1 (Amazon): Map exact headers. item_name (150+ chars), 5 bullet points (BOLD CAPS starts), and unique sync_id ([Brand]-[Model]-[Variant]).
-- Service 2 (Shopify): Create unique handle, HTML description (<strong>, <li>), and ensure SKU matches the sync_id for inventory tracking.
-- Service 3 (A+ Content): Generate 3 branding modules: The Craft, The Experience, The Trust.
-- Service 4 (Rufus AI): Write a 100-word conversational summary for AI-search optimization.
+4. Conditional Inventory Logic:
+- Extraction: Search PDF for 'Stock' or 'Qty'. 
+- Fallback: IF missing AND Config Status is true, use ${config.defaultQty}. Otherwise, output '0'.
 
-5. Success Feedback:
-- summary_message: Provide a 3-sentence summary highlighting the extraction success, detected industry, and whether fallback configs were applied.
+5. The 5 Logic Layers (Multi-Channel Sync):
+- Service 1: Amazon headers, SEO titles, 5 Bold Caps bullets, and unique sync_id.
+- Service 2: Shopify handle, HTML descriptions, and SKU synchronization.
+- Service 3: A+ Content Branding (The Craft, The Experience, The Trust).
+- Service 4: Rufus AI Semantic Summary (100 words).
+- Service 5: Technical Readiness Audit (Identify missing UPCs).
+
+6. Transparency & Feedback:
+- summary_message: Provide a 3-sentence extraction summary. If fallbacks were used, state: 'Note: Missing PDF data was safely populated using your Advanced Configuration settings to ensure import readiness.'
 
 Output: Return ONLY a valid JSON object. No conversational text.`;
 
