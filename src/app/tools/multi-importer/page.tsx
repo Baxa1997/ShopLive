@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
@@ -95,9 +96,32 @@ export default function ShopifyImporterPage() {
   const [userConfig, setUserConfig] = useState({
     defaultQty: 100,
     priceMarkup: 1.0,
-    defaultType: 'General Merchandise'
+    defaultType: 'General Merchandise',
+    targetChannels: 'Both' as 'Shopify' | 'Amazon' | 'Both'
   });
   const [isConfigConfirmed, setIsConfigConfirmed] = useState(false);
+  const [activeMarketplace, setActiveMarketplace] = useState<'shopify' | 'amazon' | 'both' | null>(null);
+
+  useEffect(() => {
+    const savedMarketplace = sessionStorage.getItem('active_marketplace');
+    if (savedMarketplace) {
+      setActiveMarketplace(savedMarketplace as any);
+    }
+
+
+    return () => {
+      sessionStorage.removeItem('active_marketplace');
+    };
+  }, []);
+
+  const handleMarketplaceSelect = (choice: 'shopify' | 'amazon' | 'both') => {
+    setActiveMarketplace(choice);
+    sessionStorage.setItem('active_marketplace', choice);
+    setUserConfig(prev => ({
+      ...prev,
+      targetChannels: choice === 'both' ? 'Both' : (choice === 'shopify' ? 'Shopify' : 'Amazon')
+    }));
+  };
 
   useEffect(() => {
     const today = new Date().toDateString();
@@ -247,45 +271,47 @@ export default function ShopifyImporterPage() {
     // fileToGenerativePart reads with FileReader which works on Blobs too.
     const imagePart = await fileToGenerativePart(file as File);
 
-    const prompt = `Act as a Senior E-commerce Data Architect for the ShopsReady Platform. 
+    const target_system = config.targetChannels === 'Both' ? ['shopify', 'amazon'] : config.targetChannels.toLowerCase();
 
-Goal: Extract product data from the PDF into a Shopify CSV with 1:1 source integrity, applying user-defined fallbacks ONLY when 'Config Status' is true.
+   const prompt = `Act as a Senior Marketplace Architect. 
 
-FALLBACK CONFIGURATIONS (Internal userConfig):
-- Default Quantity: ${config.defaultQty}
-- Price Markup: ${config.priceMarkup}
-- Default Product Type: ${config.defaultType}
-- Config Status: ${isConfigConfirmed}
+Goal: Process product data from PDF for high-integrity export.
+Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(target_system)}).
 
-1. Full-Auto Category Mapping (Safety First):
-- Primary Action: Identify the product's industry. Attempt to map it to the official 'Standard Shopify Product Category' breadcrumb (e.g., 'Home & Garden > Home Fragrances > Candles').
-- Confidence Rule: ONLY fill the 'google_product_category' column if you have high confidence in the exact Shopify taxonomy string. 
-- Safety Fallback: If unsure of the exact category string, leave the 'google_product_category' field BLANK. Instead, ensure the 'product_type' field is filled with a precise industry keyword (e.g., 'Scented Candle') to trigger Shopify's internal AI suggestions.
+1. Dynamic Identity & Vendor Detection:
+- **Source:** Extract the brand/manufacturer name directly from PDF logos, headers, or "Brand" fields.
+- **Strict Rule:** NEVER use 'ShopsReady'. 
+- **Vendor Logic:** If a specific brand is not found, attempt to identify the **Supplier/Company name** from the PDF header. Only use 'Generic' as an absolute last resort if the field is mandatory; otherwise, leave it blank to maintain data integrity.
 
-2. Strategic Industry & Type Detection:
-- Logic: Always populate the 'product_type' field with the specific industry name detected in the PDF.
-- Purpose: This acts as the secondary trigger for Shopify's taxonomy engine and tax rules.
+2. Amazon-Specific Optimization (Strict Marketplace Logic):
+- **Browse Nodes:** Map the product to the most specific Amazon 'Recommended Browse Node' path.
+- **Product Title:** Format as: [Brand] + [Product Type] + [Key Material/Feature] + [Model Number].
+- **Bullet Points (Bold Caps):** Generate 5 technical bullet points. Each MUST start with a BOLD CAPS header (e.g., 'PREMIUM MATERIAL: ...').
+- **Description:** Provide a raw text version optimized for mobile viewing (no HTML tags).
+- **Search Terms:** Provide 250 characters of high-volume keywords.
 
-3. Intelligent Price Extraction:
-- Primary Source: Search PDF for 'Wholesale', 'Wholesale Price', or 'Cost'.
-- Markup: IF price is found AND Config Status is true, multiply by ${config.priceMarkup}. Otherwise, output 1:1.
-- Strict Rule: Output '0' if no price is found. Never leave empty.
+3. Shopify 'Full-Auto' Taxonomy:
+- **Standard Product Type:** Use the full breadcrumb path (e.g., 'Office Supplies > Stationery > Notebooks & Journals').
+- **HTML Description:** Use <strong> and <li> tags for professional formatting.
+- **Handle Logic:** Ensure all color/size variants of the same product share a single 'Handle'.
 
-4. Conditional Inventory Logic:
-- Extraction: Search PDF for 'Stock' or 'Qty'. 
-- Fallback: IF missing AND Config Status is true, use ${config.defaultQty}. Otherwise, output '0'.
+4. Inventory & Pricing (Data-First Logic):
+- **Stock/Quantity:** 1. Scan PDF for "Quantity", "Stock", or "Available" columns. If found, use the exact value.
+    2. IF NO STOCK INFO IS IN PDF: Use ${config.defaultQty} ONLY IF 'Config Status' is true. 
+    3. IF 'Config Status' is false and no PDF stock exists, output '0'. 
+- **Constraint:** NEVER use placeholder numbers (like 100) if they are not explicitly in the PDF or the User Config.
+- **Cost Detection:** Extract 'Wholesale' or 'Net' price.
+- **Markup:** IF 'Config Status' is true, multiply by ${config.priceMarkup}.
 
-5. The 5 Logic Layers (Multi-Channel Sync):
-- Service 1: Amazon headers, SEO titles, 5 Bold Caps bullets, and unique sync_id.
-- Service 2: Shopify handle, HTML descriptions, and SKU synchronization.
-- Service 3: A+ Content Branding (The Craft, The Experience, The Trust).
-- Service 4: Rufus AI Semantic Summary (100 words).
-- Service 5: Technical Readiness Audit (Identify missing UPCs).
+5. Multichannel Output Formatting:
+- **Shopify Layer:** Map to Shopify CSV headers.
+- **Amazon Layer:** Map to Amazon Flat File (.xlsx/.txt) headers.
+- **Audit Layer:** Identify missing UPC/EAN codes.
 
-6. Transparency & Feedback:
-- summary_message: Provide a 3-sentence extraction summary. If fallbacks were used, state: 'Note: Missing PDF data was safely populated using your Advanced Configuration settings to ensure import readiness.'
+6. Transparency UI Feedback:
+- **summary_message:** Provide a 3-sentence summary. State: 'Note: Data optimized for ${config.targetChannels} requirements.'
 
-Output: Return ONLY a valid JSON object. No conversational text.`;
+Output: Return ONLY a valid JSON object. No filler data.`;
 
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
@@ -616,44 +642,71 @@ Output: Return ONLY a valid JSON object. No conversational text.`;
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-6 font-sans pb-10 relative">
+    <div className="min-h-0 bg-slate-50 p-6 md:p-10 font-sans pb-10 relative">
 
-      <div className="fixed top-6 left-6 z-50">
-        <Link href="/" className="flex items-center gap-2 group cursor-pointer">
-          <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all shadow-sm">
-            <Package className="w-5 h-5 text-emerald-600" />
+      <div className="flex flex-col md:flex-row items-center justify-between max-w-6xl mx-auto mb-8 px-4 gap-6 border-b border-slate-100 pb-8">
+        <Link href="/" className="flex items-center gap-2 group cursor-pointer order-1 md:order-none">
+          <div className="bg-emerald-600/10 p-2.5 rounded-2xl backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all shadow-sm">
+            <Package className="w-6 h-6 text-emerald-600" />
           </div>
-          <span className="font-heading font-bold text-lg text-slate-800 tracking-tight hidden md:block">ShopsReady</span>
+          <span className="font-heading font-black text-2xl text-slate-900 tracking-tighter">ShopsReady</span>
         </Link>
+        
+        {activeMarketplace && (
+          <div className="flex items-center gap-3 order-3 md:order-none animate-in fade-in zoom-in duration-500">
+            <div className={`pl-1.5 pr-4 py-1.5 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center gap-3 border shadow-sm transition-all ${
+              activeMarketplace === 'shopify' ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-200' :
+              activeMarketplace === 'amazon' ? 'bg-[#FF9900] text-white border-[#FF8800] shadow-orange-200' :
+              'bg-blue-600 text-white border-blue-500 shadow-blue-200'
+            }`}>
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                {activeMarketplace === 'shopify' && <ShoppingBag className="w-4 h-4" />}
+                {activeMarketplace === 'amazon' && <Package className="w-4 h-4" />}
+                {activeMarketplace === 'both' && <Globe className="w-4 h-4" />}
+              </div>
+              Architect Active: {activeMarketplace.toUpperCase()}
+            </div>
+            
+            <button 
+              onClick={() => {
+                setActiveMarketplace(null);
+                sessionStorage.removeItem('active_marketplace');
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 hover:text-red-600 hover:border-red-200 hover:shadow-lg hover:shadow-red-500/10 transition-all cursor-pointer shadow-sm group"
+            >
+              <X className="w-4 h-4 transition-transform group-hover:rotate-90" />
+              RESET
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 px-5 py-2.5 bg-white rounded-2xl border border-slate-200 shadow-sm order-2 md:order-none">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[12px] font-black text-slate-700 uppercase tracking-widest">
+            {5 - usageCount} Architectures Ready
+          </span>
+        </div>
       </div>
 
-      <header className="mb-4 text-center max-w-6xl mx-auto pt-10 relative">
-        <div className="flex items-center justify-center gap-6 md:gap-12 mb-4">
-          <div className="hidden md:flex flex-col items-center gap-1 transition-opacity">
-            <div className="w-12 h-12 bg-[#95BF47] rounded-xl flex items-center justify-center shadow-lg transform -rotate-12">
-              <ShoppingBag className="w-7 h-7 text-white" />
-            </div>
-            <span className="text-[10px] font-black text-[#95BF47] uppercase tracking-tighter">Shopify</span>
-          </div>
-
-          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight flex items-center justify-center gap-3">
-            <span className="text-emerald-600">PDF</span> to Amazon & Shopify Generator
-          </h1>
-
-          <div className="hidden md:flex flex-col items-center gap-1 transition-opacity">
-            <div className="w-12 h-12 bg-[#FF9900] rounded-xl flex items-center justify-center shadow-lg transform rotate-12">
-              <Package className="w-7 h-7 text-white" />
-            </div>
-            <span className="text-[10px] font-black text-[#FF9900] uppercase tracking-tighter">Amazon</span>
-          </div>
-        </div>
-        <p className="text-lg text-slate-600 max-w-4xl mx-auto font-medium">
-          Transform messy supplier data into high-converting <span className="font-bold text-emerald-600">Shopify CSVs</span> and <span className="text-orange-600 font-bold">Amazon Listings</span>.
+      <header className="mb-4 text-center max-w-4xl mx-auto relative px-4">
+        <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-4">
+          <span className="text-emerald-600">PDF</span> to {
+            activeMarketplace === 'shopify' ? 'Shopify CSV' :
+            activeMarketplace === 'amazon' ? 'Amazon Listing' :
+            'Marketplace'
+          } Generator
+        </h1>
+        
+        <p className="text-xl text-slate-500 max-w-5xl mx-auto font-medium leading-relaxed">
+          {activeMarketplace === 'shopify' && <>Transform messy supplier data into high-converting <span className="text-emerald-600 font-bold">Shopify CSVs</span> with taxonomy mapping.</>}
+          {activeMarketplace === 'amazon' && <>Transform messy supplier data into high-converting <span className="text-orange-500 font-bold">Amazon Listings</span> with SEO bullets.</>}
+          {activeMarketplace === 'both' && <>Transform messy supplier data into high-converting <span className="text-emerald-600 font-bold">Shopify CSVs</span> and <span className="text-orange-500 font-bold">Amazon Listings</span>.</>}
+          {!activeMarketplace && <>Select a destination to start transforming your supplier data into retail-ready assets.</>}
         </p>
       </header>
 
 
-      <div className="max-w-5xl mx-auto mb-4">
+      <div className="max-w-5xl mx-auto mb-3">
         <div className="flex items-center justify-between relative">
           {[
             { num: 1, label: 'Input Data' },
@@ -661,7 +714,7 @@ Output: Return ONLY a valid JSON object. No conversational text.`;
             { num: 3, label: 'Download CSV' }
           ].map((step, idx) => (
             <div key={step.num} className="flex-1 flex flex-col items-center relative z-10">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
                 currentStep > step.num ? 'bg-green-500 text-white' :
                 currentStep === step.num ? 'bg-green-600 text-white ring-4 ring-green-200' :
                 'bg-slate-200 text-slate-400'
@@ -685,7 +738,7 @@ Output: Return ONLY a valid JSON object. No conversational text.`;
 
         {currentStep === 1 && (
           <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-slate-200 max-w-3xl mx-auto overflow-hidden">
-            <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-8">
+            <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-4">
               <button
                 onClick={() => setInputTab('upload')}
                 className={`flex-1 cursor-pointer flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition-all ${
@@ -710,38 +763,50 @@ Output: Return ONLY a valid JSON object. No conversational text.`;
 
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
               {inputTab === 'upload' ? (
-                <div className="relative w-full">
-                  <input
-                    type="file"
-                    accept=".txt,.csv,.pdf,image/*"
-                    onChange={handleFileUpload}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                    id="file-upload"
-                  />
-                  <label 
-                    htmlFor="file-upload"
-                    className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-emerald-200 rounded-3xl bg-emerald-50/20 hover:bg-emerald-50/50 hover:border-emerald-300 transition-all cursor-pointer group h-56 shadow-inner"
-                  >
-                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md mb-4 group-hover:scale-110 transition-transform">
-                      <Upload className="w-8 h-8 text-emerald-600" />
-                    </div>
-                    <span className="font-bold text-slate-900 text-xl mb-1">Click to Upload</span>
-                    <span className="text-sm text-slate-500 text-center max-w-xs">Attach a PDF, Image, CSV or Text file from your supplier.</span>
-                    {fileName && (
-                      <div className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold ring-2 ring-emerald-200 animate-bounce">
-                        {fileName}
+                  <div className={`relative w-full ${!activeMarketplace ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <input
+                      type="file"
+                      accept=".txt,.csv,.pdf,image/*"
+                      onChange={handleFileUpload}
+                      disabled={!activeMarketplace}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                      id="file-upload"
+                    />
+                    <label 
+                      htmlFor="file-upload"
+                      className={`flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-3xl bg-emerald-50/20 hover:bg-emerald-50/50 transition-all cursor-pointer group h-56 shadow-inner ${
+                        activeMarketplace 
+                        ? 'border-emerald-400/50 shadow-[0_0_20px_rgba(16,185,129,0.1)] ring-2 ring-emerald-500/10' 
+                        : 'border-slate-200'
+                      }`}
+                    >
+                      <div className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md mb-4 group-hover:scale-110 transition-transform ${activeMarketplace ? 'text-emerald-600' : 'text-slate-400'}`}>
+                        <Upload className="w-8 h-8" />
                       </div>
-                    )}
-                  </label>
-                </div>
+                      <span className="font-bold text-slate-900 text-xl mb-1">
+                        {activeMarketplace ? 'Click to Upload' : 'Marketplace Required'}
+                      </span>
+                      <span className="text-sm text-slate-500 text-center max-w-xs">
+                        {activeMarketplace 
+                          ? `Attach a PDF or Image for ${activeMarketplace === 'both' ? 'Multichannel' : activeMarketplace.toUpperCase()}.`
+                          : 'Please select your marketplace destination above to enable uploading.'}
+                      </span>
+                      {fileName && (
+                        <div className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold ring-2 ring-emerald-200 animate-bounce">
+                          {fileName}
+                        </div>
+                      )}
+                    </label>
+                  </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="relative group">
+                  <div className={`relative group ${!activeMarketplace ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <textarea
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
-                      placeholder="Example: Blue Shirt, Size M, SKU: 123, Price: $15.00&#10;Red Jacket, Size L, SKU: 456, Price: $45.00"
-                      className="w-full min-h-[220px] p-6 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-emerald-500 focus:outline-none focus:bg-white transition-all resize-none font-mono text-sm text-slate-700 shadow-inner group-hover:border-slate-300"
+                      disabled={!activeMarketplace}
+                      placeholder={activeMarketplace ? "Example: Blue Shirt, Size M, SKU: 123, Price: $15.00\nRed Jacket, Size L, SKU: 456, Price: $45.00" : "Please select a marketplace destination first."}
+                      className="w-full min-h-[220px] p-6 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-emerald-500 focus:outline-none focus:bg-white transition-all resize-none font-mono text-sm text-slate-700 shadow-inner group-hover:border-slate-300 disabled:cursor-not-allowed"
                     />
                     <div className="absolute bottom-4 right-4 opacity-30 group-hover:opacity-100 transition-opacity">
                       <Sparkles className="w-5 h-5 text-emerald-500" />
@@ -785,12 +850,7 @@ Output: Return ONLY a valid JSON object. No conversational text.`;
                 </button>
               </div>
               
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 rounded-full border border-[red]">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] font-bold text-green uppercase tracking-[0.2em]"> {5 - usageCount} PDF Architectures remaining </span>
-                </div>
-              </div>
+              {/* Count moved to top nav for better visibility */}
             </div>
           </div>
         )}
@@ -1288,6 +1348,27 @@ Output: Return ONLY a valid JSON object. No conversational text.`;
                   />
                   <p className="text-[12px] text-[red] ml-1 italic">Classification used if PDF is generic</p>
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase ml-1 flex items-center gap-2">
+                    Target Export Channels <Settings className="w-3 h-3" />
+                  </label>
+                  <div className="flex p-1 bg-slate-100 rounded-xl">
+                    {['Shopify', 'Amazon', 'Both'].map((channel) => (
+                      <button
+                        key={channel}
+                        onClick={() => setUserConfig(prev => ({ ...prev, targetChannels: channel as any }))}
+                        className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${
+                          userConfig.targetChannels === channel 
+                          ? 'bg-white text-emerald-600 shadow-sm' 
+                          : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        {channel}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <button
@@ -1303,6 +1384,90 @@ Output: Return ONLY a valid JSON object. No conversational text.`;
           </div>
         </div>
       )}
+
+      {/* Marketplace Selector Overlay */}
+      <AnimatePresence>
+        {!activeMarketplace && currentStep === 1 && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-xl"
+          >
+            {/* Top Logo Link */}
+            <div className="absolute top-8 left-8 z-10 animate-in fade-in duration-700">
+              <Link href="/" className="flex items-center gap-2 group cursor-pointer">
+                <div className="bg-emerald-500 p-2.5 rounded-2xl shadow-xl shadow-emerald-500/20 group-hover:bg-emerald-400 transition-all">
+                  <Package className="w-6 h-6 text-white" />
+                </div>
+                <span className="font-heading font-black text-2xl text-white tracking-tighter">ShopsReady</span>
+              </Link>
+            </div>
+
+            <div className="max-w-5xl w-full">
+              <div className="text-center mb-16 flex flex-col items-center">
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.1 }}
+                >
+                  <h1 className="text-xl font-black text-white/20 uppercase tracking-[0.5em] mb-4">Marketplace Architect</h1>
+                  <h2 className="text-4xl md:text-7xl font-black text-white mb-6 tracking-tighter leading-[0.9]">
+                    Where is your data <span className="text-emerald-400 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">headed?</span>
+                  </h2>
+                  <p className="text-slate-400 text-lg md:text-xl font-medium max-w-2xl mx-auto">Select your destination to initialize the high-integrity product sync engine.</p>
+                </motion.div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[
+                  {
+                    id: 'shopify',
+                    name: 'Shopify Store',
+                    description: 'Optimized for Standard Product Taxonomy and HTML formatting.',
+                    icon: ShoppingBag,
+                    color: 'emerald'
+                  },
+                  {
+                    id: 'amazon',
+                    name: 'Amazon Marketplace',
+                    description: 'Optimized for Bold-Caps Bullets and Browse Node mapping.',
+                    icon: Package,
+                    color: 'orange'
+                  },
+                  {
+                    id: 'both',
+                    name: 'Multi-Channel',
+                    description: 'Generate both Shopify and Amazon files simultaneously.',
+                    icon: Globe,
+                    color: 'blue'
+                  }
+                ].map((choice, idx) => (
+                  <motion.button
+                    key={choice.id}
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.2 + idx * 0.1 }}
+                    whileHover={{ scale: 1.02, translateY: -5 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleMarketplaceSelect(choice.id as any)}
+                    className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem] text-left hover:bg-white/10 hover:border-emerald-500/50 transition-all group flex flex-col h-full cursor-pointer"
+                  >
+                    <div className={`w-16 h-16 rounded-2xl mb-6 flex items-center justify-center bg-${choice.color}-500/10 text-${choice.color}-400 group-hover:scale-110 transition-transform`}>
+                      <choice.icon className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-2">{choice.name}</h3>
+                    <p className="text-slate-500 leading-relaxed font-medium mb-8 flex-grow">{choice.description}</p>
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                      Select Destination <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

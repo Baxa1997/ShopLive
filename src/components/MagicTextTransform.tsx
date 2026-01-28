@@ -6,19 +6,19 @@ import { Sparkles } from 'lucide-react';
 
 const transformations = [
   {
-    before: "Mens Tee - Red, Blu, Grn (S-XL) - $12.50/ea",
-    after: "Title: Mens Premium Tee | Option1: Color (Red, Blue, Green) | Option2: Size (S, M, L, XL) | Price: $25.00 | Cost: $12.50",
-    category: "PDF to Shopify"
+    before: "Luxury Candle - Sandalwood - Wholesale $15.00 - SKU: LC-SND-01",
+    after: "Handle: luxury-candle-sandalwood | Title: [Brand] Artisan Sandalwood Candle - Hand-Poured Soy Wax - 12oz | Price: $30.00 | Type: Home & Garden > Decor > Candles",
+    category: "Multichannel Architect"
   },
   {
-    before: "kitchen knife set 6 pcs stainless steel sharp",
-    after: "Professional 6-Piece Kitchen Knife Set | High-Carbon Stainless Steel Blades | Ergonomic Handles | Rust-Resistant & Ultra-Sharp Chef Set",
+    before: "Pro Chef Knife Set - 8pcs - Steel - Sharp",
+    after: "Amazon Title: [Brand] Professional 8-Piece Chef Knife Set - High-Carbon German Steel - Ultra-Sharp Culinary Essentials - Model K800 | Bullet 1: PREMIUM MATERIAL: Forged from high-carbon X50CrMoV15 German steel for superior edge retention.",
     category: "Amazon Optimization"
   },
   {
-    before: "Inv Update: SKU 8821 is low, maybe 5 left",
-    after: "Update Inventory: SKU 8821 | Qty: 5 | Status: Low Stock Warning | Action: Reorder Triggered",
-    category: "Inventory Sync"
+    before: "Stock check: 0 items for SKU 9920",
+    after: "Inventory Sync: SKU 9920 | Status: Out of Stock | Shopify Action: Set to 0 | Amazon Action: Close Listing | Note: Safely synchronized across all channels.",
+    category: "Sync Audit"
   }
 ];
 
