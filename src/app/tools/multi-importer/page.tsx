@@ -273,7 +273,7 @@ export default function ShopifyImporterPage() {
 
     const target_system = config.targetChannels === 'Both' ? ['shopify', 'amazon'] : config.targetChannels.toLowerCase();
 
-   const prompt = `Act as a Senior Marketplace Architect. 
+    const prompt = `Act as a Senior Marketplace Architect. 
 
 Goal: Process product data from PDF for high-integrity export.
 Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(target_system)}).
@@ -281,37 +281,36 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 1. Dynamic Identity & Vendor Detection:
 - **Source:** Extract the brand/manufacturer name directly from PDF logos, headers, or "Brand" fields.
 - **Strict Rule:** NEVER use 'ShopsReady'. 
-- **Vendor Logic:** If a specific brand is not found, attempt to identify the **Supplier/Company name** from the PDF header. Only use 'Generic' as an absolute last resort if the field is mandatory; otherwise, leave it blank to maintain data integrity.
+- **Vendor Logic:** If a specific brand is not found, identify the **Supplier/Company name** from the PDF header. Only use 'Generic' as an absolute last resort if the field is mandatory; otherwise, leave it blank.
 
-2. Amazon-Specific Optimization (Strict Marketplace Logic):
+2. Product Titles & Metadata:
+- **Titles:** Use the EXACT product titles found in the PDF. Do not rewrite or "optimize" them unless specifically for Amazon formatting (Brand + Title).
+- **Amazon Titles:** [Brand] + [Exact PDF Title] + [Model Number].
+
+3. Description Logic (Authentic Extraction):
+- **Source:** Use ONLY the descriptions provided in the PDF. Do not add external info or "marketing fluff."
+- **Summarization:** If the PDF description is excessively long (over 1000 characters), summarize it while retaining all technical specs and key features.
+- **Shopify Formatting:** Convert the PDF description into professional HTML using <strong> and <li> tags.
+- **Amazon Formatting:** Convert the PDF description into clean, raw text (no HTML).
+
+4. Amazon-Specific Optimization:
 - **Browse Nodes:** Map the product to the most specific Amazon 'Recommended Browse Node' path.
-- **Product Title:** Format as: [Brand] + [Product Type] + [Key Material/Feature] + [Model Number].
-- **Bullet Points (Bold Caps):** Generate 5 technical bullet points. Each MUST start with a BOLD CAPS header (e.g., 'PREMIUM MATERIAL: ...').
-- **Description:** Provide a raw text version optimized for mobile viewing (no HTML tags).
-- **Search Terms:** Provide 250 characters of high-volume keywords.
+- **Bullet Points (Bold Caps):** Extract 5 key features from the PDF and format them as BOLD CAPS bullets (e.g., 'MATERIAL: 100% Cotton'). Do not invent new features.
+- **Search Terms:** Extract 250 characters of keywords based strictly on the PDF content.
 
-3. Shopify 'Full-Auto' Taxonomy:
-- **Standard Product Type:** Use the full breadcrumb path (e.g., 'Office Supplies > Stationery > Notebooks & Journals').
-- **HTML Description:** Use <strong> and <li> tags for professional formatting.
-- **Handle Logic:** Ensure all color/size variants of the same product share a single 'Handle'.
-
-4. Inventory & Pricing (Data-First Logic):
-- **Stock/Quantity:** 1. Scan PDF for "Quantity", "Stock", or "Available" columns. If found, use the exact value.
-    2. IF NO STOCK INFO IS IN PDF: Use ${config.defaultQty} ONLY IF 'Config Status' is true. 
+5. Inventory & Pricing (Scan-First Logic):
+- **Stock:** 1. Scan PDF for "Quantity", "Stock", or "Available". Use exact values found.
+    2. IF NO STOCK INFO IN PDF: Use ${config.defaultQty} ONLY IF 'Config Status' is true. 
     3. IF 'Config Status' is false and no PDF stock exists, output '0'. 
-- **Constraint:** NEVER use placeholder numbers (like 100) if they are not explicitly in the PDF or the User Config.
 - **Cost Detection:** Extract 'Wholesale' or 'Net' price.
 - **Markup:** IF 'Config Status' is true, multiply by ${config.priceMarkup}.
 
-5. Multichannel Output Formatting:
-- **Shopify Layer:** Map to Shopify CSV headers.
-- **Amazon Layer:** Map to Amazon Flat File (.xlsx/.txt) headers.
-- **Audit Layer:** Identify missing UPC/EAN codes.
+6. Shopify 'Full-Auto' Taxonomy:
+- **Standard Product Type:** Use the full breadcrumb path based on PDF product category.
+- **Handle Logic:** Ensure all color/size variants share a single 'Handle' for grouping.
 
-6. Transparency UI Feedback:
-- **summary_message:** Provide a 3-sentence summary. State: 'Note: Data optimized for ${config.targetChannels} requirements.'
-
-Output: Return ONLY a valid JSON object. No filler data.`;
+7. Output formatting:
+- Map to ${config.targetChannels} specific headers. Return ONLY a valid JSON object. No generic filler data.`;
 
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
