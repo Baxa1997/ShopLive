@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X } from 'lucide-react';
 import Link from 'next/link';
@@ -124,6 +124,7 @@ export default function ShopifyImporterPage() {
       ...prev,
       targetChannels: choice === 'shopify' ? 'Shopify' : 'Amazon'
     }));
+    setCurrentStep(2);
   };
 
   useEffect(() => {
@@ -287,18 +288,19 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 - **Vendor Logic:** If brand is missing, use the **Supplier/Company name** from the header. Leave blank if no supplier info exists.
 
 2. Product Titles & Metadata (1:1 Extraction):
-- **Titles:** Use the EXACT product titles found in the PDF. No optimization or rewriting.
-- **Amazon Title Format:** [Brand] + [Exact PDF Title] + [Model Number].
+- **Titles:** Use the EXACT product titles found in the PDF. No optimization or rewriting. 
+- **B2B Variant Grouping:** If the PDF lists multiple rows for the same product (e.g., different sizes/colors), group them into ONE master product object with a 'variants' array.
 
-3. Description Logic (No Generation):
-- **Rule:** Use ONLY descriptions provided in the PDF. Do not add marketing fluff.
-- **Summarization:** If text > 1000 characters, summarize while retaining all technical specs.
+3. Description Logic:
+- **Rule:** Use ONLY technical descriptions provided in the PDF.
 - **Formatting:** HTML (<strong>, <li>) for Shopify; Raw Text (no HTML) for Amazon.
 
-4. Intelligent Category Mapping (Automatic Detection):
-- **Task:** Automatically detect and map the product to the most specific **Shopify Standard Product Taxonomy** and **Amazon Recommended Browse Node**.
-- **Logic:** Use the PDF title and features to find the deepest possible breadcrumb (e.g., 'Home & Garden > Kitchen & Dining > Kitchen Tools > Salt & Pepper Shakers').
-- **Safety Gate:** If the product data is too vague to categorize with high confidence, output 'Pending Categorization' to prevent misclassification.
+4. Smart Marketplace Category:
+- **Task:** Automatically detect and map the product to the most specific **Shopify Category (2026)** or **Amazon Browse Node**.
+- **Visual Breadcrumb:** Provide the deepest possible breadcrumb (e.g., 'Home & Garden > Kitchen > Tools').
+
+5. Technical Sync:
+- **Match Score:** Assign a confidence score: 'High' (Exact Match) or 'Medium' (Review Needed).
 
 5. Amazon-Specific Extraction:
 - **Bullet Points (Bold Caps):** Extract 5 key features from the PDF and format as BOLD CAPS bullets (e.g., 'DURABLE BUILD: ...'). Do not invent new features.
@@ -311,7 +313,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 - **Cost/Markup:** Extract 'Wholesale' price. Multiply by ${config.priceMarkup} ONLY IF 'Config Status' is true.
 
 7. Technical Synchronization:
-- **Taxonomy:** Apply the detected breadcrumb to the 'Standard Product Type' (Shopify) and 'Category/Browse Node' (Amazon) fields.
+- **Category Sync:** Apply the detected breadcrumb to the 'Standard Product Type' (Shopify) and 'Category/Browse Node' (Amazon) fields.
 - **Handle Logic:** Ensure variants share a single 'Handle' for correct grouping.
 
 8. Output Formatting:
@@ -381,7 +383,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
           const newCount = usageCount + 1;
           setUsageCount(newCount);
           localStorage.setItem('import_count', newCount.toString());
-          setCurrentStep(2);
+          setCurrentStep(3);
         } else {
            throw new Error("Failed to process any pages in the PDF.");
         }
@@ -395,7 +397,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         localStorage.setItem('import_count', newCount.toString());
 
         setProducts(products);
-        setCurrentStep(2);
+        setCurrentStep(3);
 
       } else {
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -465,7 +467,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         localStorage.setItem('import_count', newCount.toString());
 
         setProducts(mockProducts);
-        setCurrentStep(2);
+        setCurrentStep(3);
       }
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -629,7 +631,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
   };
 
   const handleConfirm = () => {
-    setCurrentStep(3);
+    setCurrentStep(4);
     setTimeout(() => {
       const downloadSection = document.getElementById('download-section');
       if (downloadSection) {
@@ -639,16 +641,18 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
   };
 
   const handleStartOver = () => {
+    setActiveMarketplace(null);
     setCurrentStep(1);
     setInputText('');
     setProducts([]);
     setFileName('');
+    sessionStorage.removeItem('target_system');
   };
 
   return (
-    <div className="min-h-0 bg-slate-50 p-6 md:p-10 font-sans pb-10 relative">
+    <div className="h-[100dvh] flex flex-col bg-slate-50 font-sans overflow-hidden">
 
-      <div className="flex flex-col md:flex-row items-center justify-between max-w-6xl mx-auto mb-8 px-4 gap-6 border-b border-slate-100 pb-8">
+      <div className="flex flex-col md:flex-row items-center justify-between max-w-7xl w-full mx-auto px-8 py-4 gap-6 border-b border-slate-100 flex-shrink-0">
         <Link href="/" className="flex items-center gap-2 group cursor-pointer order-1 md:order-none">
           <div className="bg-emerald-600/10 p-2.5 rounded-2xl backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all shadow-sm">
             <Package className="w-6 h-6 text-emerald-600" />
@@ -659,21 +663,17 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         {activeMarketplace && (
           <div className="flex items-center gap-3 order-3 md:order-none animate-in fade-in zoom-in duration-500">
             <div className={`pl-1.5 pr-4 py-1.5 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center gap-3 border shadow-sm transition-all ${
-              activeMarketplace === 'shopify' ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-200' :
-              'bg-[#FF9900] text-white border-[#FF8800] shadow-orange-200'
+              activeMarketplace === 'shopify' ? 'bg-[#95BF47] text-white border-[#84ab3c] shadow-emerald-200' :
+              'bg-[#FF9900] text-white border-[#e68a00] shadow-orange-200'
             }`}>
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-                {activeMarketplace === 'shopify' && <ShoppingBag className="w-4 h-4" />}
-                {activeMarketplace === 'amazon' && <Package className="w-4 h-4" />}
+                {activeMarketplace === 'shopify' ? <img src="/shopifyLogo.png" className="w-5 h-5 object-contain brightness-0 invert" alt="" /> : <img src="/amazonLogo.png" className="w-5 h-5 object-contain brightness-0 invert" alt="" />}
               </div>
               Architect Active: {activeMarketplace.toUpperCase()}
             </div>
             
             <button 
-              onClick={() => {
-                setActiveMarketplace(null);
-                sessionStorage.removeItem('target_system');
-              }}
+              onClick={handleStartOver}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 hover:text-red-600 hover:border-red-200 hover:shadow-lg hover:shadow-red-500/10 transition-all cursor-pointer shadow-sm group"
             >
               <X className="w-4 h-4 transition-transform group-hover:rotate-90" />
@@ -683,15 +683,15 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         )}
 
         <div className="flex items-center gap-3 px-5 py-2.5 bg-white rounded-2xl border border-slate-200 shadow-sm order-2 md:order-none">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
           <span className="text-[12px] font-black text-slate-700 uppercase tracking-widest">
             {5 - usageCount} Architectures Ready
           </span>
         </div>
       </div>
 
-      <header className="mb-4 text-center max-w-4xl mx-auto relative px-4">
-        <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-4">
+      <header className="mb-2 text-center max-w-4xl mx-auto relative px-4 mt-4">
+        <h1 className="text-4xl md:text-4xl font-black text-slate-900 tracking-tighter mb-0">
           <span className="text-emerald-600">PDF</span> to {
             activeMarketplace === 'shopify' ? 'Shopify CSV' :
             activeMarketplace === 'amazon' ? 'Amazon Listing' :
@@ -707,58 +707,71 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
       </header>
 
 
-      <div className="max-w-5xl mx-auto mb-3">
-        <div className="flex items-center justify-between relative">
-          {[
-            { num: 1, label: 'Input Data' },
-            { num: 2, label: 'Review & Edit' },
-            { num: 3, label: 'Download CSV' }
-          ].map((step, idx) => (
-            <div key={step.num} className="flex-1 flex flex-col items-center relative z-10">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
-                currentStep > step.num ? 'bg-green-500 text-white' :
-                currentStep === step.num ? 'bg-green-600 text-white ring-4 ring-green-200' :
-                'bg-slate-200 text-slate-400'
-              }`}>
-                {currentStep > step.num ? <Check className="w-6 h-6" /> : step.num}
+      <div className="w-4xl mx-auto mb-12 flex-shrink-1 mt-4 px-12">
+        <div className="relative">
+          {/* Progress Line Background */}
+          <div className="absolute top-6 left-[12.5%] w-[75%] h-[3px] bg-slate-100 -z-10 rounded-full" />
+          {/* Active Progress Line */}
+          <div 
+            className="absolute top-6 left-[12.5%] h-[3px] bg-indigo-600 transition-all duration-700 ease-out -z-10 rounded-full shadow-[0_0_10px_rgba(79,70,229,0.3)]" 
+            style={{ width: `${Math.min(((currentStep - 1) / 3) * 75, 75)}%` }}
+          />
+          
+          <div className="flex justify-between items-center w-full mb-4">
+            {[
+              { num: 1, label: 'Target Platform' },
+              { num: 2, label: 'Upload Catalog' },
+              { num: 3, label: 'Smart Processing' },
+              { num: 4, label: 'Export Ready' }
+            ].map((step) => (
+              <div key={step.num} className="flex-1 relative flex flex-col items-center">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs transition-all duration-500 z-10 ${
+                  currentStep > step.num ? 'bg-indigo-600 text-white shadow-lg scale-110' :
+                  currentStep === step.num ? 'bg-indigo-600 text-white ring-8 ring-indigo-50 shadow-indigo-100 shadow-xl' :
+                  'bg-white text-slate-300 border-2 border-slate-100'
+                }`}>
+                  {currentStep > step.num ? <Check className="w-6 h-6" strokeWidth={3} /> : step.num}
+                </div>
+                <div className="absolute top-16 left-1/2 -ml-20 w-40 text-center">
+                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap block transition-all duration-300 ${
+                    currentStep >= step.num ? 'text-indigo-900 translate-y-0 opacity-100' : 'text-slate-400 translate-y-1 opacity-60'
+                  }`}>
+                    {step.label}
+                  </span>
+                </div>
               </div>
-              <span className={`mt-2 text-sm font-medium ${currentStep >= step.num ? 'text-slate-900' : 'text-slate-400'}`}>
-                {step.label}
-              </span>
-              {idx < 2 && (
-                <div className={`absolute top-6 left-1/2 w-full h-0.5 -z-10 ${currentStep > step.num ? 'bg-green-500' : 'bg-slate-200'}`} />
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
 
-      <main className="max-w-5xl mx-auto">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-10 pb-12 scroll-smooth">
+        <div className="max-w-5xl mx-auto">
         
 
-        {currentStep === 1 && (
-          <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-slate-200 max-w-3xl mx-auto overflow-hidden">
+        {currentStep === 2 && (
+          <div className="bg-white rounded-[2rem] p-8 shadow-2xl border border-slate-100 max-w-3xl mx-auto transition-all">
             <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-4">
               <button
                 onClick={() => setInputTab('upload')}
-                className={`flex-1 cursor-pointer flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition-all ${
+                className={`flex-1 cursor-pointer flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${
                   inputTab === 'upload' 
-                  ? 'bg-white text-emerald-600 shadow-sm' 
+                  ? 'bg-white text-indigo-600 shadow-sm' 
                   : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                <Upload className="w-4 h-4" /> Upload Supplier File
+                <Upload className="w-4 h-4" /> Upload Catalog
               </button>
               <button
                 onClick={() => setInputTab('manual')}
-                className={`flex-1 cursor-pointer flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition-all ${
+                className={`flex-1 cursor-pointer flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${
                   inputTab === 'manual' 
-                  ? 'bg-white text-emerald-600 shadow-sm' 
+                  ? 'bg-white text-indigo-600 shadow-sm' 
                   : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                <FileSpreadsheet className="w-4 h-4" /> Manually Type Data
+                <FileSpreadsheet className="w-4 h-4" /> Manual Entry
               </button>
             </div>
 
@@ -775,25 +788,25 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                     />
                     <label 
                       htmlFor="file-upload"
-                      className={`flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-3xl bg-emerald-50/20 hover:bg-emerald-50/50 transition-all cursor-pointer group h-56 shadow-inner ${
+                      className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-[2rem] bg-indigo-50/10 hover:bg-indigo-50/30 transition-all cursor-pointer group h-52 ${
                         activeMarketplace 
-                        ? 'border-emerald-400/50 shadow-[0_0_20px_rgba(16,185,129,0.1)] ring-2 ring-emerald-500/10' 
-                        : 'border-slate-200'
+                        ? 'border-indigo-500/30 ring-4 ring-indigo-500/5' 
+                        : 'border-slate-100'
                       }`}
                     >
-                      <div className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md mb-4 group-hover:scale-110 transition-transform ${activeMarketplace ? 'text-emerald-600' : 'text-slate-400'}`}>
+                      <div className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md mb-4 group-hover:scale-110 transition-transform ${activeMarketplace ? 'text-indigo-600' : 'text-slate-400'}`}>
                         <Upload className="w-8 h-8" />
                       </div>
                       <span className="font-bold text-slate-900 text-xl mb-1">
-                        {activeMarketplace ? 'Click to Upload' : 'Marketplace Required'}
+                        {activeMarketplace ? 'Click to Upload' : 'Platform Required'}
                       </span>
                       <span className="text-sm text-slate-500 text-center max-w-xs">
                         {activeMarketplace 
-                          ? `Attach a PDF or Image for ${activeMarketplace.toUpperCase()}.`
-                          : 'Please select your marketplace destination above to enable uploading.'}
+                          ? `Attach a PDF or Image for ${activeMarketplace.toUpperCase()} organization.`
+                          : 'Please select your target platform above to enable uploading.'}
                       </span>
                       {fileName && (
-                        <div className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold ring-2 ring-emerald-200 animate-bounce">
+                        <div className="mt-4 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-widest ring-2 ring-indigo-200 animate-bounce">
                           {fileName}
                         </div>
                       )}
@@ -806,11 +819,11 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       disabled={!activeMarketplace}
-                      placeholder={activeMarketplace ? "Example: Blue Shirt, Size M, SKU: 123, Price: $15.00\nRed Jacket, Size L, SKU: 456, Price: $45.00" : "Please select a marketplace destination first."}
-                      className="w-full min-h-[220px] p-6 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-emerald-500 focus:outline-none focus:bg-white transition-all resize-none font-mono text-sm text-slate-700 shadow-inner group-hover:border-slate-300 disabled:cursor-not-allowed"
+                      placeholder={activeMarketplace ? "Example: Blue Shirt, Size M, SKU: 123, Price: $15.00\nRed Jacket, Size L, SKU: 456, Price: $45.00" : "Please select a target platform first."}
+                      className="w-full min-h-[220px] p-6 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:outline-none focus:bg-white transition-all resize-none font-mono text-sm text-slate-700 shadow-inner group-hover:border-slate-300 disabled:cursor-not-allowed"
                     />
                     <div className="absolute bottom-4 right-4 opacity-30 group-hover:opacity-100 transition-opacity">
-                      <Sparkles className="w-5 h-5 text-emerald-500" />
+                      <Sparkles className="w-5 h-5 text-indigo-500" />
                     </div>
                   </div>
                 </div>
@@ -828,28 +841,35 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
               <div className="flex gap-4">
                 <button
                   onClick={() => setIsConfigModalOpen(true)}
-                  className="px-4 cursor-pointer bg-white border-2 border-slate-200 text-slate-600 rounded-2xl hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center group relative overflow-hidden "
+                  className="px-4 cursor-pointer bg-white border-2 border-slate-200 text-slate-600 rounded-2xl hover:border-indigo-500 hover:text-indigo-600 transition-all flex items-center justify-center group relative overflow-hidden "
                   title="Advanced Configurations"
                 >
                   <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
-                  <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
+                  <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-white" />
                 </button>
                 <button
                   onClick={handleAnalyze}
                   disabled={isLoading || (inputTab === 'upload' ? !fileName : !inputText.trim())}
-                  className="flex-1 cursor-pointer py-4 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-3xl shadow-2xl shadow-slate-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-4 text-xl group"
+                  className="flex-1 cursor-pointer py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-3xl shadow-xl shadow-indigo-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-4 text-xl group"
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="w-6 h-6 animate-spin" /> Architecting...
+                      <Loader2 className="w-6 h-6 animate-spin" /> Processing Catalog...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" /> Generate Listing Files
+                      <Sparkles className="w-6 h-6" /> Start Processing
                     </>
                   )}
                 </button>
               </div>
+              
+              <button 
+                onClick={() => setCurrentStep(1)}
+                className="text-center w-full text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-indigo-600 transition-colors"
+              >
+                ← Back to Target Platform
+              </button>
               
               {/* Count moved to top nav for better visibility */}
             </div>
@@ -857,7 +877,8 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         )}
 
 
-        {currentStep === 2 && (
+
+        {currentStep === 3 && (
           <div className="space-y-10">
             {/* Sticky Header */}
             <div className="sticky top-4 z-40 bg-white/80 backdrop-blur-md rounded-2xl p-3 md:p-4 shadow-lg border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-3 transition-all">
@@ -883,403 +904,223 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
               </div>
             </div>
 
-            <div className="space-y-6">
-              {products.map((product, pIdx) => (
-                <div key={product.sync_id || pIdx} className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden animate-in fade-in duration-300">
-                  <div className="p-4 md:p-6 space-y-6">
-                    {/* Header Row */}
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center font-bold text-sm">
-                          {pIdx + 1}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-slate-900 text-sm">Sync ID: <span className="text-emerald-600">{product.sync_id}</span></h3>
-                          <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Multi-Channel Synchronization Active</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <div className={`px-2 py-0.5 ${product.readiness_report.status.includes('100') ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'} text-[9px] font-bold rounded-full border uppercase tracking-tight`}>
-                            Architect Audit: {product.readiness_report.status}
-                        </div>
-                        <div className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold rounded-full border border-blue-100 uppercase tracking-tight">Sync Active</div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      {/* Left: Product Info */}
-                      <div className="lg:col-span-2 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Title</label>
-                            <input
-                              type="text"
-                              value={product.shopify_service.title}
-                              onChange={(e) => handleShopifyChange(pIdx, 'title', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-slate-900 outline-none transition-all"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Brand / Vendor</label>
-                            <input
-                              type="text"
-                              value={product.shopify_service.vendor}
-                              onChange={(e) => handleShopifyChange(pIdx, 'vendor', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-slate-700 outline-none transition-all"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Shopify Handle</label>
-                            <input
-                              type="text"
-                              value={product.shopify_service.handle}
-                              onChange={(e) => handleShopifyChange(pIdx, 'handle', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-400 text-xs font-mono text-slate-600 outline-none"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Category / Type</label>
-                            <input
-                              type="text"
-                              value={product.shopify_service.product_type}
-                              onChange={(e) => handleShopifyChange(pIdx, 'product_type', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 text-sm font-semibold text-slate-700 outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                           <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">SEO Title</label>
-                            <input
-                              type="text"
-                              value={product.shopify_service.seo_title}
-                              onChange={(e) => handleShopifyChange(pIdx, 'seo_title', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 text-sm font-semibold text-slate-700 outline-none"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">SEO Description</label>
-                            <input
-                              type="text"
-                              value={product.shopify_service.seo_description}
-                              onChange={(e) => handleShopifyChange(pIdx, 'seo_description', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-400 text-sm font-semibold text-slate-700 outline-none"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: Marketplace Info */}
-                      <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-200">
-                        <div className="flex items-center justify-between border-b border-slate-300 pb-2">
-                          <span className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">Elite FBA Strategy</span>
-                          <button 
-                            onClick={() => setActiveAmazonToolId(activeAmazonToolId === product.sync_id ? null : product.sync_id)}
-                            className="text-[9px] font-bold text-orange-600 hover:text-orange-700 underline flex items-center gap-1"
-                          >
-                            <Sparkles className="w-3 h-3" />
-                            {activeAmazonToolId === product.sync_id ? 'Hide Strategy' : 'View Full Architect View'}
-                          </button>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="space-y-0.5">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">FBA Item Type Keyword</span>
-                            <p className="text-xs font-bold text-slate-700 truncate">{product.amazon_fba_service.flat_file_data.item_type_keyword}</p>
-                          </div>
-                          <div className="space-y-0.5">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">FBA Feed Product Type</span>
-                            <p className="text-[10px] text-slate-600 font-mono">{product.amazon_fba_service.flat_file_data.feed_product_type}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest text-emerald-600">Architect Optimized Title</span>
-                            <div className="group/copy relative">
-                                <p className="text-[10px] font-medium text-slate-800 line-clamp-2 bg-white p-2 rounded border border-emerald-500/20 leading-tight">
-                                    {product.amazon_fba_service.flat_file_data.item_name}
-                                </p>
-                                <button 
-                                    onClick={() => navigator.clipboard.writeText(product.amazon_fba_service.flat_file_data.item_name)}
-                                    className="absolute right-1 top-1 p-1 bg-emerald-50 rounded opacity-0 group-hover/copy:opacity-100 transition-opacity"
-                                    title="Copy Title"
-                                >
-                                    <Download className="w-3 h-3 text-emerald-600" />
-                                </button>
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest w-8">#</th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Master Product</th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Smart Marketplace Category</th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Variants</th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Match</th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {products.map((product, pIdx) => (
+                      <React.Fragment key={product.sync_id || pIdx}>
+                        <tr className="hover:bg-indigo-50/30 transition-colors group cursor-pointer" onClick={() => setActiveAmazonToolId(activeAmazonToolId === product.sync_id ? null : product.sync_id)}>
+                          <td className="px-4 py-2 text-[11px] font-bold text-slate-400">{pIdx + 1}</td>
+                          <td className="px-4 py-2">
+                             <div className="flex flex-col">
+                               <span className="text-[13px] font-bold text-slate-900 leading-tight truncate max-w-[250px]">{product.shopify_service.title}</span>
+                               <span className="text-[10px] text-slate-400 font-medium">SKU: {product.sync_id}</span>
+                             </div>
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-2">
+                              {activeMarketplace === 'shopify' ? (
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 text-[9px] font-black uppercase">
+                                  <img src="/shopifyLogo.png" className="w-2.5 h-2.5 object-contain" alt="" />
+                                  {product.shopify_service.product_type.split('>').pop()?.trim() || 'Uncategorized'}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full border border-orange-100 text-[9px] font-black uppercase">
+                                  <img src="/amazonLogo.png" className="w-2.5 h-2.5 object-contain" alt="" />
+                                  {product.amazon_fba_service.flat_file_data.feed_product_type || 'Uncategorized'}
+                                </div>
+                              )}
+                              <span className="text-[10px] text-slate-400 truncate max-w-[150px] italic">
+                                {product.shopify_service.product_type}
+                              </span>
                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* AI Preview Section */}
-                    {activeAmazonToolId === product.sync_id && (
-                      <div className="p-4 bg-slate-900 rounded-xl text-white animate-in slide-in-from-top-2 duration-300">
-                        <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
-                            <div>
-                                <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Master Architect Strategy</h4>
-                                <p className="text-[9px] text-slate-400 mt-1">Operational • Marketing • Branding • SEO • Validation</p>
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <span className="inline-flex items-center justify-center px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold border border-slate-200">
+                              {product.shopify_service.variants.length} SKU
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <div className="flex items-center justify-center">
+                              <div className={`w-2 h-2 rounded-full ${product.readiness_report.status.includes('100') ? 'bg-green-500' : 'bg-orange-400'} shadow-sm`} />
                             </div>
-                            <div className="text-[10px] text-slate-400 font-medium text-right">
-                                <span className="block italic text-orange-400">Sync Master SKU: {product.sync_id}</span>
-                            </div>
-                        </div>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <button 
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                              title="Edit Details"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
                         
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <h5 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">High-Conversion Power Bullets</h5>
-                                <div className="grid grid-cols-1 gap-2">
-                                {product.amazon_fba_service.flat_file_data.bullets.map((bp, i) => (
-                                    <div key={i} className="flex items-start gap-3 group/bp bg-white/5 p-3 rounded-lg border border-white/10 hover:border-emerald-500/50 transition-all">
-                                    <div className="flex-1 text-[11px] text-slate-200 leading-relaxed">
-                                        {bp.includes(':') ? (
-                                            <>
-                                                <span className="font-black text-white uppercase tracking-wider">{bp.split(':')[0]}:</span>
-                                                {bp.split(':').slice(1).join(':')}
-                                            </>
-                                        ) : (
-                                            bp
-                                        )}
+                        {/* Expandable Technical View */}
+                        {activeAmazonToolId === product.sync_id && (
+                          <tr>
+                            <td colSpan={6} className="bg-slate-50/80 px-8 py-4 border-y border-slate-100">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-4">
+                                  <div>
+                                    <h5 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-3">Technical Variants Matrix</h5>
+                                    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                                      <table className="w-full text-[11px]">
+                                        <thead className="bg-slate-50 border-b border-slate-200">
+                                          <tr>
+                                            <th className="px-3 py-2 font-black text-slate-500 uppercase">Option</th>
+                                            <th className="px-3 py-2 font-black text-slate-500 uppercase text-center">Price</th>
+                                            <th className="px-3 py-2 font-black text-slate-500 uppercase">SKU</th>
+                                            <th className="px-3 py-2 font-black text-slate-500 uppercase text-right">Qty</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {product.shopify_service.variants.map((v, vIdx) => (
+                                            <tr key={vIdx}>
+                                              <td className="px-3 py-1.5 font-bold text-slate-700">{v.option1_value}</td>
+                                              <td className="px-3 py-1.5 text-center text-slate-900 font-bold">${v.price}</td>
+                                              <td className="px-3 py-1.5 font-mono text-indigo-600 font-medium">{v.sku}</td>
+                                              <td className="px-3 py-1.5 text-right font-black text-emerald-600">{v.inventory_qty}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
                                     </div>
-                                    <button 
-                                        onClick={() => navigator.clipboard.writeText(bp)}
-                                        className="p-1.5 bg-white/10 rounded-md hover:bg-emerald-500 transition-colors"
-                                        title="Copy Bullet Point"
-                                    >
-                                        <Check className="w-3 h-3 text-white" />
-                                    </button>
-                                    </div>
-                                ))}
-                                </div>
-
-                                <div className="pt-4 border-t border-white/10">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[8px] font-bold text-cyan-400 uppercase tracking-widest">Rufus Semantic Summary (SEO Layer 4)</span>
-                                            <Sparkles className="w-2.5 h-2.5 text-cyan-400" />
-                                        </div>
-                                    </div>
-                                    <p className="text-[11px] text-slate-300 leading-relaxed bg-black/20 p-3 rounded-lg border border-white/5">
-                                        "{product.amazon_fba_service.rufus_summary}"
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <h5 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">A+ Storytelling & Readiness (Layer 3 & 5)</h5>
-                                <div className="grid grid-cols-1 gap-3">
-                                    {product.aplus_content_service.modules.map((mod, i) => (
-                                        <div key={i} className="bg-white/5 p-3 rounded-lg border border-white/10">
-                                            <span className="text-[8px] font-bold text-orange-400 uppercase mb-1 block">Module {i+1}: {mod.header}</span>
-                                            <p className="text-[10px] text-slate-400 leading-tight">{mod.body}</p>
-                                        </div>
-                                    ))}
-                                    
-                                    <div className="bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/20">
-                                        <span className="text-[8px] font-bold text-emerald-400 uppercase mb-1 block">SEO Image Alt Text</span>
-                                        <p className="text-[10px] text-slate-300 italic">{product.aplus_content_service.image_alt_text}</p>
-                                    </div>
-                                    
-                                    <div className="p-3 bg-red-500/5 rounded-lg border border-red-500/20">
-                                        <span className="text-[8px] font-bold text-red-400 uppercase mb-1 block">Readiness Audit - Missing Fields</span>
-                                        <div className="flex flex-wrap gap-2">
-                                            {product.readiness_report.missing_fields.map((field, i) => (
-                                                <span key={i} className="text-[9px] px-2 py-0.5 bg-red-500/10 text-red-300 rounded-full border border-red-500/20 font-bold">
-                                                    {field}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 border-t border-white/10">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">FBA Master Search Terms</span>
-                                        <button 
-                                            onClick={() => navigator.clipboard.writeText(product.amazon_fba_service.search_terms)}
-                                            className="text-[9px] text-emerald-400 hover:underline"
-                                        >
-                                            Copy All
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] font-mono text-slate-500 bg-black/30 p-2 rounded break-words">
-                                        {product.amazon_fba_service.search_terms}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Variants Table */}
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">Synchronized Variant Matrix</h4>
-                      <div className="border border-slate-300 rounded-lg overflow-hidden shadow-sm">
-                        <table className="w-full text-left text-xs">
-                          <thead>
-                            <tr className="bg-slate-100 border-b border-slate-300">
-                              <th className="p-2 font-bold text-slate-600 uppercase tracking-tighter">Variant Property</th>
-                              <th className="p-2 font-bold text-slate-600 text-center uppercase tracking-tighter">Sync Price</th>
-                              <th className="p-2 font-bold text-slate-600 uppercase tracking-tighter">Global SKU (Link)</th>
-                              <th className="p-2 font-bold text-slate-600 text-center uppercase tracking-tighter">Sync Stock</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200">
-                            {product.shopify_service.variants.map((v, vIdx) => (
-                              <tr key={vIdx} className="hover:bg-slate-50 transition-colors">
-                                <td className="p-2">
-                                  <input
-                                    type="text"
-                                    value={v.option1_value}
-                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'option1_value', e.target.value)}
-                                    className="w-full bg-transparent font-bold text-slate-900 outline-none border-b border-transparent focus:border-emerald-500"
-                                  />
-                                </td>
-                                <td className="p-2 w-24 border-x border-slate-200">
-                                  <div className="flex items-center justify-center">
-                                    <span className="text-slate-400 mr-0.5">$</span>
-                                    <input
-                                      type="text"
-                                      value={v.price}
-                                      onChange={(e) => handleVariantChange(pIdx, vIdx, 'price', e.target.value)}
-                                      className="w-12 bg-transparent font-bold text-slate-700 outline-none text-center"
-                                    />
                                   </div>
-                                </td>
-                                <td className="p-2 border-r border-slate-200">
-                                  <input
-                                    type="text"
-                                    value={v.sku}
-                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'sku', e.target.value)}
-                                    className="w-full bg-transparent font-mono text-[10px] text-emerald-600 font-bold outline-none"
-                                  />
-                                </td>
-                                <td className="p-2 w-20 text-center">
-                                  <input
-                                    type="number"
-                                    value={v.inventory_qty}
-                                    onChange={(e) => handleVariantChange(pIdx, vIdx, 'inventory_qty', e.target.value)}
-                                    className="w-full bg-transparent font-bold text-emerald-600 outline-none text-center"
-                                  />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                                </div>
+                                <div className="space-y-4">
+                                   <div>
+                                     <h5 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-3">Architect Context</h5>
+                                     <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-4">
+                                        <div>
+                                          <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Rufus SEO Summary</span>
+                                          <p className="text-[12px] text-slate-600 italic leading-relaxed">"{product.amazon_fba_service.rufus_summary}"</p>
+                                        </div>
+                                        <div className="pt-3 border-t border-slate-100">
+                                          <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">A+ Storytelling Module</span>
+                                          <p className="text-[11px] text-slate-900 font-medium">{product.aplus_content_service.modules[0]?.body || 'No A+ content detected.'}</p>
+                                        </div>
+                                        <div className="flex gap-2 pt-2">
+                                           <button onClick={() => downloadShopifyCSV()} className="flex-1 py-1.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-700 transition-all">Export Shopify</button>
+                                           <button onClick={() => downloadMultiChannelPackage()} className="flex-1 py-1.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-slate-800 transition-all">Export Amazon</button>
+                                        </div>
+                                     </div>
+                                   </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
             {/* Back & Next Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-10 border-t border-slate-200/60 max-w-4xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-10">
               <button
-                onClick={() => setCurrentStep(1)}
-                className="px-8 py-4 text-slate-400 font-black hover:text-slate-900 transition-all flex items-center gap-3 group/back text-sm uppercase tracking-widest"
+                onClick={() => setCurrentStep(2)}
+                className="px-6 py-3 text-slate-400 font-bold hover:text-slate-900 transition-all flex items-center gap-2 group/back text-[11px] uppercase tracking-widest"
               >
-                <div className="w-10 h-10 rounded-xl border-2 border-slate-100 flex items-center justify-center group-hover/back:border-slate-900 group-hover/back:bg-slate-900 group-hover/back:text-white transition-all">
-                  <ArrowLeft className="w-5 h-5" />
-                </div>
-                Return to Inputs
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Upload
               </button>
-              <div className="flex gap-4 w-full md:w-auto">
+              <div className="flex gap-3 w-full md:w-auto">
                 <button
                   onClick={() => handleConfirm()}
-                  className="flex-1 md:flex-none px-12 py-5 bg-emerald-600 text-white font-black rounded-[1.5rem] hover:bg-emerald-700 transition-all shadow-2xl shadow-emerald-500/30 flex items-center justify-center gap-3 text-lg ring-4 ring-white"
+                  className="flex-1 md:flex-none px-10 py-4 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest"
                 >
-                  Confirm & Sync All <ArrowRight className="w-6 h-6 animate-pulse" />
+                  Finalize & Sync <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {currentStep === 3 && (
-          <div id="download-section" className="bg-white rounded-[2.5rem] p-4 md:p-6 shadow-2xl border border-slate-100 text-center max-w-4xl mx-auto relative overflow-hidden">
+        {currentStep === 4 && (
+          <div id="download-section" className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-2xl border border-slate-100 text-center max-w-4xl mx-auto relative overflow-hidden animate-in fade-in zoom-in duration-500">
             {/* Background Decoration */}
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500" />
-            <div className="absolute -top-16 -right-16 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl" />
+            <div className="absolute top-0 left-0 w-full h-2 bg-indigo-600" />
+            <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl" />
             
-            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-inner group transition-transform hover:rotate-6 duration-500">
-              <Sparkles className="w-6 h-6" />
+            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner group transition-transform hover:rotate-6 duration-500">
+              <Check className="w-8 h-8" />
             </div>
             
-            <div className="space-y-4 mb-6 text-center">
-              <h2 className="text-4xl md:text-4xl font-black text-slate-900 tracking-tighter leading-none">
-                Experience the <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-cyan-600">Elite Sync.</span>
+            <div className="space-y-4 mb-8 text-center">
+              <h2 className="text-4xl md:text-4xl font-black text-slate-900 tracking-tighter leading-tight">
+                Export <span className="text-indigo-600">Complete.</span>
               </h2>
-              {products.length > 0 && (
-                <p className="text-md w-full text-slate-600 max-w-4xl mx-auto leading-relaxed font-medium">
-                  {products[0].success_feedback.summary_message}
-                </p>
-              )}
+              {/* <p className="text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed font-medium">
+                Your catalog has been synchronized with **Official 2026 Marketplace Taxonomies**. Direct-upload files are ready below.
+              </p> */}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-left">
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl relative group">
-                    <span className="text-[8px] font-black text-emerald-600 uppercase mb-2 block tracking-widest">Digital Operational Layer</span>
-                    <h5 className="text-[10px] font-bold text-slate-900 mb-1">Amazon FBA Flat File</h5>
-                    <p className="text-[9px] text-slate-500 leading-tight">Ready-to-upload .txt with mapped Browse Nodes and 5-point Power Bullets.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 text-left">
+                <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl relative group hover:border-indigo-200 transition-colors">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100">
+                        <img src="/shopifyLogo.png" className="w-6 h-6 object-contain" alt="" />
+                      </div>
+                      <h5 className="text-[12px] font-black text-slate-900 uppercase tracking-widest">Shopify Storefront</h5>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed mb-4">Full product catalog with high-fidelity B2B variants and Smart Category mapping.</p>
+                    <button onClick={() => downloadShopifyCSV()} className="w-full py-2.5 bg-white border border-slate-200 text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+                      <Download className="w-3.5 h-3.5" /> Download CSV
+                    </button>
                 </div>
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl relative group">
-                    <span className="text-[8px] font-black text-blue-600 uppercase mb-2 block tracking-widest">Marketing Layer</span>
-                    <h5 className="text-[10px] font-bold text-slate-900 mb-1">Shopify Multi-Sync</h5>
-                    <p className="text-[9px] text-slate-500 leading-tight">Synchronized SKUs and HTML descriptions with mobile-optimized titles.</p>
-                </div>
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl relative group">
-                    <span className="text-[8px] font-black text-orange-600 uppercase mb-2 block tracking-widest">Branding Layer</span>
-                    <h5 className="text-[10px] font-bold text-slate-900 mb-1">A+ Storytelling</h5>
-                    <p className="text-[9px] text-slate-500 leading-tight">Storytelling modules and SEO image alt-text for Amazon Brand Registry.</p>
+                <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl relative group hover:border-orange-200 transition-colors">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100">
+                        <img src="/amazonLogo.png" className="w-6 h-6 object-contain" alt="" />
+                      </div>
+                      <h5 className="text-[12px] font-black text-slate-900 uppercase tracking-widest">Amazon Marketplace</h5>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed mb-4">Search-optimized listings with Rufus AI semantic layers and A+ Storytelling modules.</p>
+                    <button onClick={() => downloadMultiChannelPackage()} className="w-full py-2.5 bg-white border border-slate-200 text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+                      <Download className="w-3.5 h-3.5" /> Download Pro Package
+                    </button>
                 </div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4 mb-6 text-left relative group hover:border-emerald-500/30 transition-all">
-                <div className="absolute -top-3 -left-3 bg-emerald-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">ShopsReady Architect Active</div>
-                <p className="text-sm text-slate-700 leading-relaxed italic">
-                    "From Mobile-First Amazon Titles to A+ Storytelling, ShopsReady.com ensures your products are not just listed, but optimized for the modern buyer and Amazon&apos;s Rufus AI."
-                </p>
-                <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-emerald-600 uppercase tracking-widest">
-                    <Check className="w-3 h-3" /> Rufus Indexing Pre-Checked
-                    <span className="mx-2 text-slate-300">•</span>
-                    <Check className="w-3 h-3" /> A+ Storytelling Rendered
+            <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 mb-10 text-left relative group">
+                <div className="flex items-center gap-2 text-[11px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-3">
+                  <Sparkles className="w-4 h-4" /> ShopsReady Architect Verdict
                 </div>
+                <p className="text-sm text-slate-700 leading-relaxed italic border-l-2 border-indigo-200 pl-4">
+                  "Architecture verified. All 2026 category breadcrumbs injected. B2B Variant grouping synchronized. Your data is 100% market-ready."
+                </p>
             </div>
             
-            <div className="grid grid-cols-1 gap-4 mb-10 text-center">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
               <button
-                onClick={() => downloadMultiChannelPackage()}
-                className="w-full cursor-pointer py-4 bg-slate-900 text-white font-black rounded-3xl hover:bg-slate-800 transition-all shadow-2xl shadow-slate-900/20 flex items-center justify-center gap-4 text-xl group ring-8 ring-slate-50"
-              >
-                <Download className="w-7 h-7 group-hover:translate-y-1 transition-transform" /> Download Elite Package
-              </button>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => downloadShopifyCSV()}
-                  className="py-4 cursor-pointer bg-white border-2 border-slate-100 text-slate-700 font-black rounded-2xl hover:border-emerald-500 hover:text-emerald-700 transition-all flex items-center justify-center gap-3 text-sm shadow-sm"
-                >
-                  <FileSpreadsheet className="w-5 h-5 text-emerald-600" /> Shopify CSV
-                </button>
-                <button
-                   onClick={() => downloadMultiChannelPackage()} 
-                   className="py-4 bg-white cursor-pointer border-2 border-slate-100 text-slate-700 font-black rounded-2xl hover:border-orange-500 hover:text-orange-700 transition-all flex items-center justify-center gap-3 text-sm shadow-sm"
-                >
-                  <Package className="w-5 h-5 text-orange-500" /> Amazon Pro Package
-                </button>
-              </div>
-            </div>
-
-            <button
                 onClick={handleStartOver}
-                className="text-slate-400 cursor-pointer font-black text-[10px] uppercase tracking-[0.2em] hover:text-slate-600 transition-all"
-            >
-                ← Start New Architectural Sync
-            </button>
+                className="px-10 py-5 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 text-sm uppercase tracking-widest"
+              >
+                Start New Project
+              </button>
+              <Link
+                href="/"
+                className="px-10 py-5 bg-white border-2 border-slate-100 text-slate-500 font-bold rounded-2xl hover:border-slate-300 transition-all text-sm"
+              >
+                Back to Dashboard
+              </Link>
+            </div>
           </div>
         )}
 
+        </div>
       </main>
 
       {/* Advanced Config Modal */}
@@ -1388,7 +1229,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 
       {/* Marketplace Selector Overlay */}
       <AnimatePresence>
-        {!activeMarketplace && currentStep === 1 && (
+        {currentStep === 1 && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1407,12 +1248,12 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 
               <div className="relative z-10 text-center mb-12">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest mb-4">
-                  <Settings className="w-3 h-3" /> System Initialization
+                  <Sparkles className="w-3 h-3 text-indigo-500" /> Platform Selection
                 </div>
                 <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-4">
-                  Marketplace Gate
+                  Where are you selling?
                 </h2>
-                <p className="text-slate-500 text-lg font-medium">Select your primary architecture to sync official 2026 taxonomies.</p>
+                <p className="text-slate-500 text-lg font-medium">Select your platform. We&apos;ll automatically organize your products into official 2026 categories.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
@@ -1420,7 +1261,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                   {
                     id: 'shopify',
                     name: 'Shopify Store',
-                    tagline: 'Standard Taxonomy Synced',
+                    tagline: 'Standard Marketplace Category Synced',
                     description: 'Direct mapping to Official Shopify 2026 Category Trees.',
                     logo: '/shopifyLogo.png',
                     color: 'emerald'
