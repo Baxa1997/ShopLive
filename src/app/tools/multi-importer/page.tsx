@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X, Globe } from 'lucide-react';
+import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
@@ -100,26 +100,29 @@ export default function ShopifyImporterPage() {
     targetChannels: 'Both' as 'Shopify' | 'Amazon' | 'Both'
   });
   const [isConfigConfirmed, setIsConfigConfirmed] = useState(false);
-  const [activeMarketplace, setActiveMarketplace] = useState<'shopify' | 'amazon' | 'both' | null>(null);
+  const [activeMarketplace, setActiveMarketplace] = useState<'shopify' | 'amazon' | null>(null);
 
   useEffect(() => {
-    const savedMarketplace = sessionStorage.getItem('active_marketplace');
+    const savedMarketplace = sessionStorage.getItem('target_system');
     if (savedMarketplace) {
       setActiveMarketplace(savedMarketplace as any);
+      setUserConfig(prev => ({
+        ...prev,
+        targetChannels: savedMarketplace === 'shopify' ? 'Shopify' : 'Amazon'
+      }));
     }
 
-
     return () => {
-      sessionStorage.removeItem('active_marketplace');
+      sessionStorage.removeItem('target_system');
     };
   }, []);
 
-  const handleMarketplaceSelect = (choice: 'shopify' | 'amazon' | 'both') => {
+  const handleMarketplaceSelect = (choice: 'shopify' | 'amazon') => {
     setActiveMarketplace(choice);
-    sessionStorage.setItem('active_marketplace', choice);
+    sessionStorage.setItem('target_system', choice);
     setUserConfig(prev => ({
       ...prev,
-      targetChannels: choice === 'both' ? 'Both' : (choice === 'shopify' ? 'Shopify' : 'Amazon')
+      targetChannels: choice === 'shopify' ? 'Shopify' : 'Amazon'
     }));
   };
 
@@ -279,38 +282,40 @@ Goal: Process product data from PDF for high-integrity export.
 Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(target_system)}).
 
 1. Dynamic Identity & Vendor Detection:
-- **Source:** Extract the brand/manufacturer name directly from PDF logos, headers, or "Brand" fields.
+- **Source:** Extract brand/manufacturer from PDF logos, headers, or "Brand" fields.
 - **Strict Rule:** NEVER use 'ShopsReady'. 
-- **Vendor Logic:** If a specific brand is not found, identify the **Supplier/Company name** from the PDF header. Only use 'Generic' as an absolute last resort if the field is mandatory; otherwise, leave it blank.
+- **Vendor Logic:** If brand is missing, use the **Supplier/Company name** from the header. Leave blank if no supplier info exists.
 
-2. Product Titles & Metadata:
-- **Titles:** Use the EXACT product titles found in the PDF. Do not rewrite or "optimize" them unless specifically for Amazon formatting (Brand + Title).
-- **Amazon Titles:** [Brand] + [Exact PDF Title] + [Model Number].
+2. Product Titles & Metadata (1:1 Extraction):
+- **Titles:** Use the EXACT product titles found in the PDF. No optimization or rewriting.
+- **Amazon Title Format:** [Brand] + [Exact PDF Title] + [Model Number].
 
-3. Description Logic (Authentic Extraction):
-- **Source:** Use ONLY the descriptions provided in the PDF. Do not add external info or "marketing fluff."
-- **Summarization:** If the PDF description is excessively long (over 1000 characters), summarize it while retaining all technical specs and key features.
-- **Shopify Formatting:** Convert the PDF description into professional HTML using <strong> and <li> tags.
-- **Amazon Formatting:** Convert the PDF description into clean, raw text (no HTML).
+3. Description Logic (No Generation):
+- **Rule:** Use ONLY descriptions provided in the PDF. Do not add marketing fluff.
+- **Summarization:** If text > 1000 characters, summarize while retaining all technical specs.
+- **Formatting:** HTML (<strong>, <li>) for Shopify; Raw Text (no HTML) for Amazon.
 
-4. Amazon-Specific Optimization:
-- **Browse Nodes:** Map the product to the most specific Amazon 'Recommended Browse Node' path.
-- **Bullet Points (Bold Caps):** Extract 5 key features from the PDF and format them as BOLD CAPS bullets (e.g., 'MATERIAL: 100% Cotton'). Do not invent new features.
-- **Search Terms:** Extract 250 characters of keywords based strictly on the PDF content.
+4. Intelligent Category Mapping (Automatic Detection):
+- **Task:** Automatically detect and map the product to the most specific **Shopify Standard Product Taxonomy** and **Amazon Recommended Browse Node**.
+- **Logic:** Use the PDF title and features to find the deepest possible breadcrumb (e.g., 'Home & Garden > Kitchen & Dining > Kitchen Tools > Salt & Pepper Shakers').
+- **Safety Gate:** If the product data is too vague to categorize with high confidence, output 'Pending Categorization' to prevent misclassification.
 
-5. Inventory & Pricing (Scan-First Logic):
-- **Stock:** 1. Scan PDF for "Quantity", "Stock", or "Available". Use exact values found.
-    2. IF NO STOCK INFO IN PDF: Use ${config.defaultQty} ONLY IF 'Config Status' is true. 
-    3. IF 'Config Status' is false and no PDF stock exists, output '0'. 
-- **Cost Detection:** Extract 'Wholesale' or 'Net' price.
-- **Markup:** IF 'Config Status' is true, multiply by ${config.priceMarkup}.
+5. Amazon-Specific Extraction:
+- **Bullet Points (Bold Caps):** Extract 5 key features from the PDF and format as BOLD CAPS bullets (e.g., 'DURABLE BUILD: ...'). Do not invent new features.
+- **Search Terms:** Extract 250 characters of keywords based strictly on PDF content.
 
-6. Shopify 'Full-Auto' Taxonomy:
-- **Standard Product Type:** Use the full breadcrumb path based on PDF product category.
-- **Handle Logic:** Ensure all color/size variants share a single 'Handle' for grouping.
+6. Inventory & Pricing (Scan-First Logic):
+- **Stock:** 1. Use exact 'Quantity' or 'Stock' values from PDF if found.
+    2. IF MISSING: Use ${config.defaultQty} ONLY IF 'Config Status' is true. 
+    3. Otherwise, output '0'. NEVER use placeholder numbers like '100'.
+- **Cost/Markup:** Extract 'Wholesale' price. Multiply by ${config.priceMarkup} ONLY IF 'Config Status' is true.
 
-7. Output formatting:
-- Map to ${config.targetChannels} specific headers. Return ONLY a valid JSON object. No generic filler data.`;
+7. Technical Synchronization:
+- **Taxonomy:** Apply the detected breadcrumb to the 'Standard Product Type' (Shopify) and 'Category/Browse Node' (Amazon) fields.
+- **Handle Logic:** Ensure variants share a single 'Handle' for correct grouping.
+
+8. Output Formatting:
+- Map to ${config.targetChannels} headers. Return ONLY a valid JSON object. No filler data.`;
 
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
@@ -655,13 +660,11 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
           <div className="flex items-center gap-3 order-3 md:order-none animate-in fade-in zoom-in duration-500">
             <div className={`pl-1.5 pr-4 py-1.5 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center gap-3 border shadow-sm transition-all ${
               activeMarketplace === 'shopify' ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-200' :
-              activeMarketplace === 'amazon' ? 'bg-[#FF9900] text-white border-[#FF8800] shadow-orange-200' :
-              'bg-blue-600 text-white border-blue-500 shadow-blue-200'
+              'bg-[#FF9900] text-white border-[#FF8800] shadow-orange-200'
             }`}>
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
                 {activeMarketplace === 'shopify' && <ShoppingBag className="w-4 h-4" />}
                 {activeMarketplace === 'amazon' && <Package className="w-4 h-4" />}
-                {activeMarketplace === 'both' && <Globe className="w-4 h-4" />}
               </div>
               Architect Active: {activeMarketplace.toUpperCase()}
             </div>
@@ -669,7 +672,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
             <button 
               onClick={() => {
                 setActiveMarketplace(null);
-                sessionStorage.removeItem('active_marketplace');
+                sessionStorage.removeItem('target_system');
               }}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 hover:text-red-600 hover:border-red-200 hover:shadow-lg hover:shadow-red-500/10 transition-all cursor-pointer shadow-sm group"
             >
@@ -699,7 +702,6 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         <p className="text-xl text-slate-500 max-w-5xl mx-auto font-medium leading-relaxed">
           {activeMarketplace === 'shopify' && <>Transform messy supplier data into high-converting <span className="text-emerald-600 font-bold">Shopify CSVs</span> with taxonomy mapping.</>}
           {activeMarketplace === 'amazon' && <>Transform messy supplier data into high-converting <span className="text-orange-500 font-bold">Amazon Listings</span> with SEO bullets.</>}
-          {activeMarketplace === 'both' && <>Transform messy supplier data into high-converting <span className="text-emerald-600 font-bold">Shopify CSVs</span> and <span className="text-orange-500 font-bold">Amazon Listings</span>.</>}
           {!activeMarketplace && <>Select a destination to start transforming your supplier data into retail-ready assets.</>}
         </p>
       </header>
@@ -787,7 +789,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                       </span>
                       <span className="text-sm text-slate-500 text-center max-w-xs">
                         {activeMarketplace 
-                          ? `Attach a PDF or Image for ${activeMarketplace === 'both' ? 'Multichannel' : activeMarketplace.toUpperCase()}.`
+                          ? `Attach a PDF or Image for ${activeMarketplace.toUpperCase()}.`
                           : 'Please select your marketplace destination above to enable uploading.'}
                       </span>
                       {fileName && (
@@ -1391,79 +1393,79 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-xl"
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-white/60 backdrop-blur-sm"
           >
-            {/* Top Logo Link */}
-            <div className="absolute top-8 left-8 z-10 animate-in fade-in duration-700">
-              <Link href="/" className="flex items-center gap-2 group cursor-pointer">
-                <div className="bg-emerald-500 p-2.5 rounded-2xl shadow-xl shadow-emerald-500/20 group-hover:bg-emerald-400 transition-all">
-                  <Package className="w-6 h-6 text-white" />
-                </div>
-                <span className="font-heading font-black text-2xl text-white tracking-tighter">ShopsReady</span>
-              </Link>
-            </div>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] border border-slate-100 p-10 max-w-4xl w-full relative overflow-hidden"
+            >
+              {/* Decorative Background Elements */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50" />
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-50 rounded-full blur-3xl -ml-32 -mb-32 opacity-50" />
 
-            <div className="max-w-5xl w-full">
-              <div className="text-center mb-16 flex flex-col items-center">
-                <motion.div
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                >
-                  <h1 className="text-xl font-black text-white/20 uppercase tracking-[0.5em] mb-4">Marketplace Architect</h1>
-                  <h2 className="text-4xl md:text-7xl font-black text-white mb-6 tracking-tighter leading-[0.9]">
-                    Where is your data <span className="text-emerald-400 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">headed?</span>
-                  </h2>
-                  <p className="text-slate-400 text-lg md:text-xl font-medium max-w-2xl mx-auto">Select your destination to initialize the high-integrity product sync engine.</p>
-                </motion.div>
+              <div className="relative z-10 text-center mb-12">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest mb-4">
+                  <Settings className="w-3 h-3" /> System Initialization
+                </div>
+                <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-4">
+                  Marketplace Gate
+                </h2>
+                <p className="text-slate-500 text-lg font-medium">Select your primary architecture to sync official 2026 taxonomies.</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
                 {[
                   {
                     id: 'shopify',
                     name: 'Shopify Store',
-                    description: 'Optimized for Standard Product Taxonomy and HTML formatting.',
-                    icon: ShoppingBag,
+                    tagline: 'Standard Taxonomy Synced',
+                    description: 'Direct mapping to Official Shopify 2026 Category Trees.',
+                    logo: '/shopifyLogo.png',
                     color: 'emerald'
                   },
                   {
                     id: 'amazon',
                     name: 'Amazon Marketplace',
-                    description: 'Optimized for Bold-Caps Bullets and Browse Node mapping.',
-                    icon: Package,
+                    tagline: 'Browse Node Optimized',
+                    description: 'High-precision mapping to Amazon Service Browse Nodes.',
+                    logo: '/amazonLogo.png',
                     color: 'orange'
-                  },
-                  {
-                    id: 'both',
-                    name: 'Multi-Channel',
-                    description: 'Generate both Shopify and Amazon files simultaneously.',
-                    icon: Globe,
-                    color: 'blue'
                   }
-                ].map((choice, idx) => (
-                  <motion.button
+                ].map((choice) => (
+                  <button
                     key={choice.id}
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.2 + idx * 0.1 }}
-                    whileHover={{ scale: 1.02, translateY: -5 }}
-                    whileTap={{ scale: 0.98 }}
                     onClick={() => handleMarketplaceSelect(choice.id as any)}
-                    className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem] text-left hover:bg-white/10 hover:border-emerald-500/50 transition-all group flex flex-col h-full cursor-pointer"
+                    className="group p-8 bg-white border-2 border-slate-50 rounded-[2.5rem] text-left hover:border-slate-900 transition-all duration-300 flex flex-col h-full cursor-pointer shadow-sm hover:shadow-2xl"
                   >
-                    <div className={`w-16 h-16 rounded-2xl mb-6 flex items-center justify-center bg-${choice.color}-500/10 text-${choice.color}-400 group-hover:scale-110 transition-transform`}>
-                      <choice.icon className="w-8 h-8" />
+                    <div className="w-16 h-16 rounded-2xl mb-6 flex items-center justify-center bg-white shadow-sm overflow-hidden p-2 group-hover:scale-110 transition-transform duration-300">
+                      <img 
+                        src={choice.logo} 
+                        alt={choice.name} 
+                        className="w-full h-full object-contain"
+                      />
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">{choice.name}</h3>
-                    <p className="text-slate-500 leading-relaxed font-medium mb-8 flex-grow">{choice.description}</p>
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                      Select Destination <ArrowRight className="w-4 h-4" />
+                    <div className="mb-4">
+                      <h3 className="text-2xl font-black text-slate-900 mb-1">{choice.name}</h3>
+                      <span className={`text-[10px] font-black uppercase tracking-widest text-${choice.color}-600 bg-${choice.color}-50 px-2 py-0.5 rounded-md border border-${choice.color}-100`}>
+                        {choice.tagline}
+                      </span>
                     </div>
-                  </motion.button>
+                    <p className="text-slate-500 leading-relaxed font-medium text-sm flex-grow mb-6">{choice.description}</p>
+                    <div className="flex items-center gap-2 text-slate-900 font-black text-[10px] uppercase tracking-widest group-hover:translate-x-2 transition-transform">
+                      Initialize Architect <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </button>
                 ))}
               </div>
-            </div>
+
+              <div className="mt-12 pt-8 border-t border-slate-50 text-center">
+                <Link href="/" className="text-slate-400 hover:text-slate-900 text-sm font-bold transition-colors">
+                  Return to Dashboard
+                </Link>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
