@@ -34,6 +34,7 @@ interface UnifiedProduct {
     tags: string;
     vendor: string;
     product_type: string;
+    category: string;
     google_product_category: string;
     seo_title: string;
     seo_description: string;
@@ -90,6 +91,7 @@ export default function ShopifyImporterPage() {
   const [error, setError] = useState('');
   const [usageCount, setUsageCount] = useState(0);
   const [inputTab, setInputTab] = useState<'upload' | 'manual'>('upload');
+  const [isCategorizing, setIsCategorizing] = useState(false);
 
   // Advanced Configuration State
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -341,6 +343,8 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
     setIsLoading(true);
     setError('');
     
+    let allProducts: UnifiedProduct[] = [];
+
     try {
       if (!process.env.NEXT_PUBLIC_GOOGLE_API_KEY) {
         throw new Error('API key not configured.');
@@ -371,6 +375,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
           try {
             const chunkProducts = await extractData(fileChunk, process.env.NEXT_PUBLIC_GOOGLE_API_KEY, userConfig, isConfigConfirmed);
             setProducts(prev => [...prev, ...chunkProducts]);
+            allProducts = [...allProducts, ...chunkProducts]; // Accumulate
             hasProcessedAtLeastOne = true;
           } catch (chunkErr) {
             console.error(`Error processing chunk ${i}-${i+batchSize}:`, chunkErr);
@@ -380,10 +385,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         }
         
         if (hasProcessedAtLeastOne) {
-          const newCount = usageCount + 1;
-          setUsageCount(newCount);
-          localStorage.setItem('import_count', newCount.toString());
-          setCurrentStep(3);
+          // Logic moved to end of function
         } else {
            throw new Error("Failed to process any pages in the PDF.");
         }
@@ -391,13 +393,10 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
       } else if (uploadedFile && uploadedFile.type.includes('image')) {
         
         const products = await extractData(uploadedFile, process.env.NEXT_PUBLIC_GOOGLE_API_KEY, userConfig, isConfigConfirmed);
-
-        const newCount = usageCount + 1;
-        setUsageCount(newCount);
-        localStorage.setItem('import_count', newCount.toString());
-
+        
+        allProducts = products;
         setProducts(products);
-        setCurrentStep(3);
+        // setCurrentStep(3); -> Moved to end
 
       } else {
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -416,6 +415,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
               tags: 'denim, jacket, men fashion, rugged',
               vendor: 'Urban Threads',
               product_type: 'Outerwear',
+              category: 'Apparel & Accessories > Clothing > Outerwear > Coats & Jackets',
               google_product_category: 'Apparel & Accessories > Clothing > Outerwear > Coats & Jackets',
               seo_title: 'Urban Threads Rugged Denim Jacket - Premium Navy Outerwear',
               seo_description: 'Upgrade your style with the Urban Threads Rugged Denim Jacket. Featuring 14oz reinforced denim and double-stitched seams for maximum durability.',
@@ -462,12 +462,22 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
             }
           }
         ];
+        setProducts(mockProducts);
+        allProducts = mockProducts;
+      }
+
+      if (allProducts.length > 0) {
         const newCount = usageCount + 1;
         setUsageCount(newCount);
         localStorage.setItem('import_count', newCount.toString());
 
-        setProducts(mockProducts);
+        // Run categorization BEFORE showing review page
+        const categorizedProducts = await handleSmartCategorization(allProducts);
+        
+        // Only show review page after categorization is complete
+        setProducts(categorizedProducts);
         setCurrentStep(3);
+        setIsLoading(false);
       }
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -475,8 +485,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         console.error('API Error Response:', err.response);
       }
       setError(err.message || 'Failed to analyze. Please try again.');
-    } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
@@ -500,21 +509,25 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 
   const generateCSV = () => {
     const headers = [
-      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Google Product Category', 'Tags', 'Published',
+      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Product Category', 'Google Product Category', 'Tags', 'Published',
       'Option1 Name', 'Option1 Value', 'Variant Price', 'Variant Grams', 
       'Variant Inventory Tracker', 'Variant Inventory Qty', 'Variant SKU', 'SEO Title', 'SEO Description'
     ];
     
     const rows: any[] = [];
     products.forEach(p => {
+      // Clean Google Product Category - remove gid:// prefix if present
+      const cleanGoogleCategory = p.shopify_service.google_product_category?.replace(/^gid:\/\/shopify\/TaxonomyCategory\//, '') || '';
+      
       p.shopify_service.variants.forEach(v => {
         rows.push([
           p.shopify_service.handle,
           p.shopify_service.title,
           p.shopify_service.html_description,
           p.shopify_service.vendor,
-          p.shopify_service.product_type, // Exact category name from PDF
-          p.shopify_service.google_product_category, // Standard Category
+          p.shopify_service.product_type,
+          p.shopify_service.category,
+          cleanGoogleCategory,
           p.shopify_service.tags,
           'TRUE', 
           v.option1_name,
@@ -638,6 +651,82 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         downloadSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }, 100);
+  };
+
+
+
+  const handleSmartCategorization = async (productsToRefine: UnifiedProduct[]): Promise<UnifiedProduct[]> => {
+    setIsCategorizing(true);
+    try {
+      const payload = {
+        shopId: "extreme-test-lab",
+        products: productsToRefine.map(p => ({
+          title: p.shopify_service.title,
+          sku: p.sync_id,
+          price: p.shopify_service.variants[0]?.price || "0.00"
+        }))
+      };
+
+      const res = await fetch('http://localhost:5001/api/v1/categories/group-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Categorization service failed');
+      
+      const responseData = await res.json();
+      
+      if (!responseData.success || !Array.isArray(responseData.data)) {
+        throw new Error('Invalid response from categorization service');
+      }
+
+      // Merge Logic
+      const updatedProducts = productsToRefine.map(p => {
+        const match = responseData.data.find((r: any) => r.sku === p.sync_id);
+        if (match) {
+          const newDescription = match.description 
+            ? `<p>${match.description}</p>` 
+            : p.shopify_service.html_description;
+
+          return {
+            ...p,
+            shopify_service: {
+              ...p.shopify_service,
+              title: match.refined_title || p.shopify_service.title,
+              product_type: match.category || p.shopify_service.product_type,
+              category: match.category || p.shopify_service.category || '',
+              google_product_category: match.google_product_category || p.shopify_service.google_product_category,
+              html_description: newDescription,
+            },
+            amazon_fba_service: {
+               ...p.amazon_fba_service,
+               flat_file_data: {
+                 ...p.amazon_fba_service.flat_file_data,
+                 item_name: match.refined_title || p.amazon_fba_service.flat_file_data.item_name,
+                 item_type_keyword: match.category ? match.category.split(' > ').pop() || '' : p.amazon_fba_service.flat_file_data.item_type_keyword,
+                 feed_product_type: match.category ? match.category.split(' > ').pop() || '' : p.amazon_fba_service.flat_file_data.feed_product_type,
+                 bullets: match.description ? [match.description] : p.amazon_fba_service.flat_file_data.bullets
+               }
+            },
+             readiness_report: {
+                ...p.readiness_report,
+                status: 'Categorized by AI'
+             }
+          } as UnifiedProduct; 
+        }
+        return p;
+      });
+
+      setIsCategorizing(false);
+      return updatedProducts;
+
+    } catch (err) {
+      console.error('Categorization error:', err);
+      setIsCategorizing(false);
+      // Return original products if categorization fails
+      return productsToRefine;
+    }
   };
 
   const handleStartOver = () => {
@@ -854,7 +943,8 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="w-6 h-6 animate-spin" /> Processing Catalog...
+                      <Loader2 className="w-6 h-6 animate-spin" /> 
+                      {isCategorizing ? 'AI Categorizing Products...' : 'Processing Catalog...'}
                     </>
                   ) : (
                     <>
@@ -889,6 +979,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                 </p>
               </div>
               <div className="flex gap-3 w-full md:w-auto">
+                {/* Button Removed */}
                 <button
                   onClick={() => downloadMultiChannelPackage()}
                   className="flex-1 md:flex-none px-5 py-2.5 bg-emerald-900 text-white text-sm font-bold rounded-xl hover:bg-emerald-800 transition-all flex items-center justify-center gap-2 shadow-xl group"
@@ -929,22 +1020,27 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                              </div>
                           </td>
                           <td className="px-4 py-2">
-                            <div className="flex items-center gap-2">
-                              {activeMarketplace === 'shopify' ? (
-                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 text-[9px] font-black uppercase">
-                                  <img src="/shopifyLogo.png" className="w-2.5 h-2.5 object-contain" alt="" />
-                                  {product.shopify_service.product_type.split('>').pop()?.trim() || 'Uncategorized'}
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full border border-orange-100 text-[9px] font-black uppercase">
-                                  <img src="/amazonLogo.png" className="w-2.5 h-2.5 object-contain" alt="" />
-                                  {product.amazon_fba_service.flat_file_data.feed_product_type || 'Uncategorized'}
-                                </div>
-                              )}
-                              <span className="text-[10px] text-slate-400 truncate max-w-[150px] italic">
-                                {product.shopify_service.product_type}
-                              </span>
-                            </div>
+                             <div className="flex flex-col gap-1.5 min-w-[200px]">
+                               <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border w-fit ${
+                                   activeMarketplace === 'shopify' 
+                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                   : 'bg-orange-50 text-orange-700 border-orange-100'
+                               }`}>
+                                  {activeMarketplace === 'shopify' ? <img src="/shopifyLogo.png" className="w-3 h-3 object-contain" alt="" /> : <img src="/amazonLogo.png" className="w-3 h-3 object-contain" alt="" />}
+                                  {/* Show Leaf Category */}
+                                  {(activeMarketplace === 'shopify' 
+                                     ? product.shopify_service.product_type 
+                                     : product.amazon_fba_service.flat_file_data.feed_product_type
+                                  ).split('>').pop()?.trim() || 'Pending...'}
+                               </div>
+                               
+                               {/* Full Breadcrumb */}
+                               <span className="text-[10px] text-slate-500 font-medium leading-relaxed break-words whitespace-normal">
+                                 {activeMarketplace === 'shopify' 
+                                    ? product.shopify_service.product_type 
+                                    : product.amazon_fba_service.flat_file_data.item_type_keyword}
+                               </span>
+                             </div>
                           </td>
                           <td className="px-4 py-2 text-center">
                             <span className="inline-flex items-center justify-center px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold border border-slate-200">
