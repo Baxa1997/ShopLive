@@ -516,7 +516,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
     
     const rows: any[] = [];
     products.forEach(p => {
-      // Clean Google Product Category - remove gid:// prefix if present
+
       const cleanGoogleCategory = p.shopify_service.google_product_category?.replace(/^gid:\/\/shopify\/TaxonomyCategory\//, '') || '';
       
       p.shopify_service.variants.forEach(v => {
@@ -667,7 +667,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         }))
       };
 
-      const res = await fetch('http://localhost:5001/api/v1/categories/group-bulk', {
+      const res = await fetch('https://api.shopsready.com/api/v1/categories/group-bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
