@@ -47,7 +47,7 @@ export default function MagicTextTransform() {
   const current = transformations[currentIndex];
 
   return (
-    <div className="absolute top-1/5 -translate-y-1/2 right-10 md:right-10 w-[320px] pointer-events-none z-0 hidden lg:block">
+    <div className="absolute top-2/5 -translate-y-1/2 right-10 md:right-10 w-[320px] pointer-events-none z-0 hidden lg:block">
       <div className="relative">
         <motion.div 
           initial={{ opacity: 0, y: -10 }}

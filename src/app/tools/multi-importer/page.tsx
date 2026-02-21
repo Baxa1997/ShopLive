@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X, History, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { saveToHistory } from '@/lib/history';
+import { saveProject } from '@/lib/projects';
+import { getUsageStatus, incrementUsage, FREE_LIMIT } from '@/lib/limits';
 
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -81,7 +82,6 @@ const fileToGenerativePart = async (file: File): Promise<any> => {
   });
 };
 
-const FREE_LIMIT = 2; // Free generations per day
 
 export default function ShopifyImporterPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -136,18 +136,11 @@ export default function ShopifyImporterPage() {
     setCurrentStep(2);
   };
 
+  // Load usage status from Supabase on mount
   useEffect(() => {
-    const today = new Date().toDateString();
-    const savedDate = localStorage.getItem('import_usage_date');
-    const savedCount = localStorage.getItem('import_count');
-
-    if (savedDate !== today) {
-      localStorage.setItem('import_usage_date', today);
-      localStorage.setItem('import_count', '0');
-      setUsageCount(0);
-    } else {
-      setUsageCount(Number(savedCount) || 0);
-    }
+    getUsageStatus().then(status => {
+      setUsageCount(status.count);
+    });
   }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -348,7 +341,9 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
   };
 
   const handleAnalyze = async () => {
-    if (usageCount >= FREE_LIMIT) {
+    // Check limit from Supabase before starting
+    const status = await getUsageStatus();
+    if (!status.canGenerate) {
       setShowPaywall(true);
       return;
     }
@@ -538,23 +533,23 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
       }
 
       if (allProducts.length > 0) {
-        const newCount = usageCount + 1;
-        setUsageCount(newCount);
-        localStorage.setItem('import_count', newCount.toString());
+        // Increment usage counter in Supabase
+        await incrementUsage();
+        setUsageCount(prev => prev + 1);
 
         setLoadingStatus(`Categorizing ${allProducts.length} products with AI…`);
         setLoadingProgress(85);
         // Run smart categorization BEFORE showing the review page
         const categorizedProducts = await handleSmartCategorization(allProducts);
         
-        // Save to history
+        // Save to Supabase (async — don't block the UI)
         setLoadingProgress(95);
-        saveToHistory({
+        saveProject({
           fileName: fileName || 'Manual Entry',
           marketplace: (activeMarketplace as any) || 'shopify',
           productCount: categorizedProducts.length,
           products: categorizedProducts,
-        });
+        }).catch(err => console.warn('saveProject failed (user may not be logged in):', err));
 
         setProducts(categorizedProducts);
         setCurrentStep(3);

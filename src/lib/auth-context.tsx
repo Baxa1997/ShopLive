@@ -1,60 +1,69 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
-export interface GoogleUser {
-  sub: string;
-  name: string;
-  email: string;
-  picture: string;
-  given_name: string;
-}
+import { type User } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/client';
 
 interface AuthContextType {
-  user: GoogleUser | null;
+  user: User | null;
   isLoading: boolean;
-  signIn: (user: GoogleUser) => void;
-  signOut: () => void;
+  signOut: () => Promise<void>;
   isPro: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
-  signIn: () => {},
-  signOut: () => {},
+  signOut: async () => {},
   isPro: false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<GoogleUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPro, setIsPro] = useState(false);
+  const supabase = createClient();
+
+  // Fetch the profile to get real isPro status
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('plan, subscription_status')
+      .eq('id', userId)
+      .single();
+    setIsPro(data?.plan === 'pro' && data?.subscription_status === 'active');
+  };
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('shopsready_user');
-      if (saved) {
-        setUser(JSON.parse(saved));
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) fetchProfile(session.user.id);
+      setIsLoading(false);
+    });
+
+    // 2. Listen for auth changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setIsPro(false);
       }
-    } catch {}
-    setIsLoading(false);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = (googleUser: GoogleUser) => {
-    setUser(googleUser);
-    localStorage.setItem('shopsready_user', JSON.stringify(googleUser));
-  };
-
-  const signOut = () => {
+  const signOut = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('shopsready_user');
+    setIsPro(false);
   };
-
-  // Pro status — placeholder until real billing is wired
-  const isPro = false;
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn, signOut, isPro }}>
+    <AuthContext.Provider value={{ user, isLoading, signOut, isPro }}>
       {children}
     </AuthContext.Provider>
   );

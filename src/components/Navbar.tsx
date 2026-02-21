@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, History, LogOut, ChevronDown, Crown, X, Zap } from 'lucide-react';
-import { useGoogleLogin } from '@react-oauth/google';
+import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 
 function ShopsReadyIcon({ className }: { className?: string }) {
@@ -37,7 +37,7 @@ function ShopsReadyIcon({ className }: { className?: string }) {
 }
 
 export default function Navbar() {
-  const { user, signIn, signOut, isPro } = useAuth();
+  const { user, signOut, isPro } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -71,25 +71,21 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setIsSigningIn(true);
-      try {
-        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        if (!res.ok) throw new Error('Failed to fetch user info');
-        const profile = await res.json();
-        signIn(profile);
-        setShowLoginModal(false);
-      } catch (err) {
-        console.error('Failed to fetch Google user info:', err);
-        setIsSigningIn(false);
-      }
-    },
-    onError: () => { setIsSigningIn(false); },
-    onNonOAuthError: () => { setIsSigningIn(false); },
-  });
+  const handleGoogleLogin = async () => {
+    setIsSigningIn(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) {
+      console.error('Google login error:', error.message);
+      setIsSigningIn(false);
+    }
+    // Page will redirect, so no need to reset isSigningIn on success
+  };
 
   const navLinks = [
     { href: '/tools/multi-importer', label: 'Generator', icon: Sparkles },
@@ -174,11 +170,11 @@ export default function Navbar() {
                   className="flex items-center gap-2 pl-1 pr-3 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-2xl transition-all"
                 >
                   <img
-                    src={user.picture}
-                    alt={user.name}
+                    src={user.user_metadata?.picture || user.user_metadata?.avatar_url}
+                    alt={user.user_metadata?.full_name || user.email}
                     className="w-7 h-7 rounded-xl object-cover"
                   />
-                  <span className="hidden sm:block text-xs font-bold text-slate-900 leading-none">{user.given_name}</span>
+                  <span className="hidden sm:block text-xs font-bold text-slate-900 leading-none">{user.user_metadata?.given_name || user.user_metadata?.full_name?.split(' ')[0]}</span>
                   <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
                 </button>
 
@@ -192,7 +188,7 @@ export default function Navbar() {
                       className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden z-50"
                     >
                       <div className="p-3 border-b border-slate-100">
-                        <p className="text-sm font-bold text-slate-900">{user.name}</p>
+                        <p className="text-sm font-bold text-slate-900">{user.user_metadata?.full_name || user.email}</p>
                         <p className="text-xs text-slate-400 truncate">{user.email}</p>
                       </div>
                       <div className="p-1.5 flex flex-col gap-0.5">
@@ -287,7 +283,7 @@ export default function Navbar() {
                 </div>
 
                 <button
-                  onClick={() => { setIsSigningIn(true); googleLogin(); }}
+                   onClick={handleGoogleLogin}
                   disabled={isSigningIn}
                   className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold transition-all disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden"
                 >
