@@ -2,11 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X, History, Zap } from 'lucide-react';
+import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X, History, Zap, Crown, LogIn } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { saveProject } from '@/lib/projects';
-import { getUsageStatus, incrementUsage, FREE_LIMIT } from '@/lib/limits';
+import { getUsageStatus, incrementUsage, ANON_FREE_LIMIT, LOGGED_IN_FREE_LIMIT } from '@/lib/limits';
+import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/utils/supabase/client';
+import { redirectToCheckout, type StripePlan } from '@/lib/stripe';
 
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -84,6 +87,7 @@ const fileToGenerativePart = async (file: File): Promise<any> => {
 
 
 export default function ShopifyImporterPage() {
+  const { user, isPro } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
@@ -95,10 +99,15 @@ export default function ShopifyImporterPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [usageCount, setUsageCount] = useState(0);
+  const [usageLimit, setUsageLimit] = useState(ANON_FREE_LIMIT);
   const [inputTab, setInputTab] = useState<'upload' | 'manual'>('upload');
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallGate, setPaywallGate] = useState<'signup' | 'payment'>('signup');
   const [selectedPlan, setSelectedPlan] = useState<'pay-per-use' | 'monthly' | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState<StripePlan | null>(null);
+  const [checkoutError, setCheckoutError] = useState('');
 
   // Advanced Configuration State
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -136,12 +145,41 @@ export default function ShopifyImporterPage() {
     setCurrentStep(2);
   };
 
-  // Load usage status from Supabase on mount
+  // Load usage status from Supabase on mount and whenever user changes
   useEffect(() => {
     getUsageStatus().then(status => {
       setUsageCount(status.count);
+      setUsageLimit(status.limit === Infinity ? Infinity : status.limit);
     });
-  }, []);
+  }, [user]);
+
+  // Google sign-in handler (for the paywall sign-up gate)
+  const handleGoogleSignIn = async () => {
+    setIsSigningIn(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) {
+      console.error('Google login error:', error.message);
+      setIsSigningIn(false);
+    }
+  };
+
+  // Stripe checkout handler for the paywall
+  const handlePaywallCheckout = async (plan: StripePlan) => {
+    setCheckoutError('');
+    setIsCheckoutLoading(plan);
+    try {
+      await redirectToCheckout(plan, user?.email ?? undefined);
+    } catch (err: any) {
+      setCheckoutError(err.message || 'Something went wrong. Please try again.');
+      setIsCheckoutLoading(null);
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -341,11 +379,15 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
   };
 
   const handleAnalyze = async () => {
-    // Check limit from Supabase before starting
-    const status = await getUsageStatus();
-    if (!status.canGenerate) {
-      setShowPaywall(true);
-      return;
+    // Pro users skip all limit checks
+    if (!isPro) {
+      // Check limit from Supabase before starting
+      const status = await getUsageStatus();
+      if (!status.canGenerate) {
+        setPaywallGate(status.gate === 'none' ? 'signup' : status.gate);
+        setShowPaywall(true);
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -820,8 +862,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
     sessionStorage.removeItem('target_system');
   };
 
-  // ─── Paywall Modal ────────────────────────────────────────────────────────────
-  // Inline paywall JSX (not a component) to prevent re-mounting on plan selection
+  // ─── Paywall Modal (two modes: signup vs payment) ──────────────────────────
   const paywallJsx = (
     <AnimatePresence>
       {showPaywall && (
@@ -839,88 +880,172 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
             transition={{ type: 'spring', damping: 22, stiffness: 280 }}
             className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
           >
-            {/* Header */}
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 p-7 text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/4" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/10 rounded-full translate-y-1/2 -translate-x-1/4" />
-              <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all">
-                <X className="w-4 h-4" />
-              </button>
-              <div className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                <Zap className="w-6 h-6 text-amber-900" />
-              </div>
-              <h2 className="text-2xl font-black tracking-tight mb-1">Free limit reached</h2>
-              <p className="text-white/60 text-sm">You've used your {FREE_LIMIT} free generations today. Choose a plan to keep going.</p>
-            </div>
-
-            {/* Plans */}
-            <div className="p-6 space-y-3">
-              {/* Pay-per-use */}
-              <button
-                onClick={() => setSelectedPlan('pay-per-use')}
-                className={`w-full p-4 rounded-2xl border-2 text-left transition-all group ${
-                  selectedPlan === 'pay-per-use'
-                    ? 'border-emerald-500 bg-emerald-50'
-                    : 'border-slate-200 hover:border-slate-300 bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
-                      selectedPlan === 'pay-per-use' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
-                    }`}>⚡</div>
-                    <span className="font-bold text-slate-900">Pay Per Generation</span>
+            {/* ── GATE 1: Sign Up with Google ─────────────────────── */}
+            {paywallGate === 'signup' && (
+              <>
+                {/* Header */}
+                <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-7 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/4" />
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/4" />
+                  <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all">
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                    <LogIn className="w-6 h-6 text-white" />
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-slate-900">$1</span>
-                    <span className="text-xs text-slate-400 ml-1">/ run</span>
-                  </div>
+                  <h2 className="text-2xl font-black tracking-tight mb-1">You&apos;re doing great!</h2>
+                  <p className="text-white/70 text-sm">You&apos;ve used your {ANON_FREE_LIMIT} free generations. Sign up to unlock {LOGGED_IN_FREE_LIMIT - ANON_FREE_LIMIT} more — completely free!</p>
                 </div>
-                <p className="text-xs text-slate-500 pl-10">One-time payment. Process any PDF once (no page limit), download immediately.</p>
-              </button>
 
-              {/* Monthly */}
-              <button
-                onClick={() => setSelectedPlan('monthly')}
-                className={`w-full p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden ${
-                  selectedPlan === 'monthly'
-                    ? 'border-emerald-500 bg-emerald-50'
-                    : 'border-slate-200 hover:border-slate-300 bg-white'
-                }`}
-              >
-                <div className="absolute top-3 right-3">
-                  <span className="bg-emerald-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wide">Best Value</span>
-                </div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
-                      selectedPlan === 'monthly' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
-                    }`}>👑</div>
-                    <span className="font-bold text-slate-900">Monthly Pro</span>
+                {/* Benefits */}
+                <div className="p-6 space-y-4">
+                  <div className="space-y-2.5">
+                    {[
+                      { icon: Sparkles, text: `${LOGGED_IN_FREE_LIMIT - ANON_FREE_LIMIT} more free generations`, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                      { icon: History, text: 'Save & access your generation history', color: 'text-blue-600', bg: 'bg-blue-50' },
+                      { icon: Zap, text: 'Unlock pay-per-use & Pro plans', color: 'text-amber-600', bg: 'bg-amber-50' },
+                    ].map((benefit, i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+                        <div className={`w-8 h-8 ${benefit.bg} ${benefit.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                          <benefit.icon className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-700">{benefit.text}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-slate-900">$9.99</span>
-                    <span className="text-xs text-slate-400 ml-1">/ month</span>
-                  </div>
+
+                  {/* Google Sign In Button */}
+                  <button
+                    onClick={handleGoogleSignIn}
+                    disabled={isSigningIn}
+                    className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold transition-all disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden"
+                  >
+                    <AnimatePresence>
+                      {isSigningIn && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute inset-0 bg-slate-900 flex items-center justify-center z-10"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Signing in...</span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" opacity=".8"/>
+                      <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" opacity=".8"/>
+                      <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" opacity=".8"/>
+                    </svg>
+                    <span>Continue with Google</span>
+                  </button>
+
+                  <p className="text-center text-[10px] text-slate-400">By joining, you agree to our Terms of Use and Privacy Policy.</p>
                 </div>
-                <p className="text-xs text-slate-500 pl-10">Unlimited generations (no limit) · Priority AI · Full history · Bulk exports</p>
-              </button>
+              </>
+            )}
 
-              {/* CTA */}
-              <button
-                disabled={!selectedPlan}
-                onClick={() => {
-                  // In a real app, integrate Stripe here
-                  setShowPaywall(false);
-                }}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <Zap className="w-4 h-4" />
-                {selectedPlan === 'monthly' ? 'Subscribe for $9.99/mo' : selectedPlan === 'pay-per-use' ? 'Pay $1 & Continue' : 'Select a Plan'}
-              </button>
+            {/* ── GATE 2: Payment (Pay $1 or Go Pro) ─────────────── */}
+            {paywallGate === 'payment' && (
+              <>
+                {/* Header */}
+                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 p-7 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/4" />
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/10 rounded-full translate-y-1/2 -translate-x-1/4" />
+                  <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all">
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                    <Zap className="w-6 h-6 text-amber-900" />
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight mb-1">All free generations used</h2>
+                  <p className="text-white/60 text-sm">You&apos;ve used all {LOGGED_IN_FREE_LIMIT} free generations today. Choose how to continue.</p>
+                </div>
 
-              <p className="text-center text-xs text-slate-400">Secure checkout · Cancel anytime · Instant access</p>
-            </div>
+                {/* Plans */}
+                <div className="p-6 space-y-3">
+                  {/* Pay-per-use */}
+                  <button
+                    onClick={() => setSelectedPlan('pay-per-use')}
+                    className={`w-full p-4 rounded-2xl border-2 text-left transition-all group ${
+                      selectedPlan === 'pay-per-use'
+                        ? 'border-emerald-500 bg-emerald-50'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
+                          selectedPlan === 'pay-per-use' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                        }`}>⚡</div>
+                        <span className="font-bold text-slate-900">Pay Per Generation</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-black text-slate-900">$1</span>
+                        <span className="text-xs text-slate-400 ml-1">/ run</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 pl-10">One-time payment. Process any PDF once (no page limit), download immediately.</p>
+                  </button>
+
+                  {/* Monthly */}
+                  <button
+                    onClick={() => setSelectedPlan('monthly')}
+                    className={`w-full p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden ${
+                      selectedPlan === 'monthly'
+                        ? 'border-emerald-500 bg-emerald-50'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <div className="absolute top-3 right-3">
+                      <span className="bg-emerald-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wide">Best Value</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
+                          selectedPlan === 'monthly' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                        }`}>👑</div>
+                        <span className="font-bold text-slate-900">Monthly Pro</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-black text-slate-900">$9.99</span>
+                        <span className="text-xs text-slate-400 ml-1">/ month</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 pl-10">Unlimited generations (no limit) · Priority AI · Full history · Bulk exports</p>
+                  </button>
+
+                  {/* Checkout error */}
+                  {checkoutError && (
+                    <p className="text-sm text-red-500 font-semibold text-center">{checkoutError}</p>
+                  )}
+
+                  {/* CTA — Stripe checkout */}
+                  <button
+                    disabled={!selectedPlan || !!isCheckoutLoading}
+                    onClick={() => {
+                      if (selectedPlan === 'pay-per-use') handlePaywallCheckout('pay_per_use');
+                      if (selectedPlan === 'monthly') handlePaywallCheckout('pro_monthly');
+                    }}
+                    className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isCheckoutLoading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Redirecting to Checkout...</>
+                    ) : (
+                      <><Zap className="w-4 h-4" />
+                      {selectedPlan === 'monthly' ? 'Subscribe for $9.99/mo' : selectedPlan === 'pay-per-use' ? 'Pay $1 & Continue' : 'Select a Plan'}
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-center text-xs text-slate-400">Secure checkout · Cancel anytime · Instant access</p>
+                </div>
+              </>
+            )}
           </motion.div>
         </motion.div>
       )}
@@ -1029,47 +1154,66 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                 )}
               </div>
 
-              {/* Usage Quota Meter */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Daily Quota</p>
-                  <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                    usageCount >= FREE_LIMIT ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'
-                  }`}>
-                    {usageCount >= FREE_LIMIT ? 'Limit Reached' : `${FREE_LIMIT - usageCount} Left`}
-                  </span>
+              {/* Usage Quota Meter — hidden for Pro users */}
+              {isPro ? (
+                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl border border-emerald-200 p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Crown className="w-4 h-4 text-emerald-600" />
+                    <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Pro Plan</p>
+                  </div>
+                  <p className="text-xs text-emerald-600 font-bold">Unlimited generations — no limits!</p>
                 </div>
-                {/* Segmented bar */}
-                <div className="flex gap-1.5 mb-3">
-                  {Array.from({ length: FREE_LIMIT }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-2.5 flex-1 rounded-full transition-all ${
-                        i < usageCount ? 'bg-emerald-500' : 'bg-slate-100 border border-slate-200'
-                      }`}
-                    />
-                  ))}
+              ) : (
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Daily Quota</p>
+                    <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                      usageCount >= (usageLimit === Infinity ? 9999 : usageLimit) ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      {usageCount >= (usageLimit === Infinity ? 9999 : usageLimit)
+                        ? 'Limit Reached'
+                        : `${(usageLimit === Infinity ? '∞' : usageLimit - usageCount)} Left`}
+                    </span>
+                  </div>
+                  {/* Segmented bar */}
+                  <div className="flex gap-1.5 mb-3">
+                    {Array.from({ length: usageLimit === Infinity ? 4 : (usageLimit as number) }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-2.5 flex-1 rounded-full transition-all ${
+                          i < usageCount ? 'bg-emerald-500' : 'bg-slate-100 border border-slate-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mb-3">
+                    {usageCount} of {usageLimit === Infinity ? '∞' : usageLimit} free generations used today.
+                    {!user && <span className="text-blue-500 font-bold"> Sign up for {LOGGED_IN_FREE_LIMIT - ANON_FREE_LIMIT} more!</span>}
+                  </p>
+                  {usageCount >= (usageLimit === Infinity ? 9999 : usageLimit) ? (
+                    <button
+                      onClick={() => {
+                        setPaywallGate(user ? 'payment' : 'signup');
+                        setShowPaywall(true);
+                      }}
+                      className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-xs font-black rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-2"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      {user ? 'Unlock More · from $1' : 'Sign Up for Free Uses'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setPaywallGate('payment');
+                        setShowPaywall(true);
+                      }}
+                      className="w-full py-2 border border-dashed border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-600 text-xs font-bold rounded-xl transition-all"
+                    >
+                      Upgrade for Unlimited
+                    </button>
+                  )}
                 </div>
-                <p className="text-xs text-slate-400 mb-3">
-                  {usageCount} of {FREE_LIMIT} free generations used today.
-                </p>
-                {usageCount >= FREE_LIMIT ? (
-                  <button
-                    onClick={() => setShowPaywall(true)}
-                    className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-xs font-black rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-2"
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    Unlock More · from $1
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setShowPaywall(true)}
-                    className="w-full py-2 border border-dashed border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-600 text-xs font-bold rounded-xl transition-all"
-                  >
-                    Upgrade for Unlimited
-                  </button>
-                )}
-              </div>
+              )}
 
 
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
@@ -1201,7 +1345,11 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                     onClick={handleAnalyze}
                     disabled={isLoading || (inputTab === 'upload' ? !fileName : !inputText.trim())}
                     className={`w-full cursor-pointer py-4 font-black rounded-3xl shadow-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-1.5 text-xl relative overflow-hidden ${
-                      usageCount >= FREE_LIMIT
+                      isPro
+                        ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 shadow-emerald-200 hover:from-emerald-700 hover:to-emerald-600 text-white'
+                        : !user && usageCount >= ANON_FREE_LIMIT
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 shadow-indigo-100 hover:from-blue-600 hover:to-indigo-700 text-white'
+                        : user && usageCount >= LOGGED_IN_FREE_LIMIT
                         ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-orange-100 hover:from-amber-600 hover:to-orange-600 text-white'
                         : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
                     }`}
@@ -1212,10 +1360,21 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                           <Loader2 className="w-6 h-6 animate-spin" />
                           <span className="truncate max-w-[280px] text-base font-bold">{loadingStatus || (isCategorizing ? 'AI Categorizing Products...' : 'Processing Catalog...')}</span>
                         </>
-                      ) : usageCount >= FREE_LIMIT ? (
+                      ) : isPro ? (
+                        <>
+                          <Crown className="w-6 h-6" />
+                          Start Processing
+                          <span className="text-xs font-medium opacity-70 ml-1">(Pro — Unlimited)</span>
+                        </>
+                      ) : !user && usageCount >= ANON_FREE_LIMIT ? (
+                        <>
+                          <LogIn className="w-6 h-6" />
+                          Sign Up to Continue (Free)
+                        </>
+                      ) : user && usageCount >= LOGGED_IN_FREE_LIMIT ? (
                         <>
                           <Zap className="w-6 h-6" />
-                          Unlock & Process ($1 or $9.99/mo)
+                          Pay $1 to Process
                         </>
                       ) : (
                         <>
@@ -1236,11 +1395,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                     )}
                   </button>
 
-                  {usageCount < FREE_LIMIT && (
-                    <p className="text-center text-xs text-slate-400 font-medium">
-                      {FREE_LIMIT - usageCount} free {FREE_LIMIT - usageCount === 1 ? 'generation' : 'generations'} remaining today
-                    </p>
-                  )}
+
                 </div>
               </div>
             </div>

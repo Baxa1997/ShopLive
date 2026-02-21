@@ -1,35 +1,49 @@
-// lib/stripe.ts
-// Frontend Stripe checkout helper
-// Calls our backend /api/stripe/checkout to get a session URL, then redirects
+
 
 export type StripePlan = 'pay_per_use' | 'pro_monthly';
 
-/**
- * Redirects the user to Stripe Checkout.
- * The backend API route creates the session and returns the URL.
- * @param plan - which plan to purchase
- * @param userEmail - pre-fills the email in Stripe Checkout
- */
+const STRIPE_API_BASE = 'https://api.shopsready.com/api/v1';
+
 export async function redirectToCheckout(plan: StripePlan, userEmail?: string): Promise<void> {
+  let data: any;
+
   try {
-    const res = await fetch('/api/stripe/checkout', {
+    const res = await fetch(`${STRIPE_API_BASE}/stripe/checkout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, email: userEmail }),
+      body: JSON.stringify({
+        plan,
+        email: userEmail ?? '',
+      }),
     });
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Failed to create checkout session');
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`Server returned non-JSON response (status ${res.status})`);
     }
 
-    const { url } = await res.json();
-    if (!url) throw new Error('No checkout URL returned');
-
-    // Redirect user to Stripe's hosted checkout page
-    window.location.href = url;
+    if (!res.ok) {
+      throw new Error(data?.error || data?.message || `Server error: ${res.status}`);
+    }
   } catch (err: any) {
-    console.error('Stripe checkout error:', err.message);
+    // Network-level error (offline, CORS, DNS failure, etc.)
+    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      throw new Error('Could not connect to the payment server. Please try again.');
+    }
     throw err;
   }
+
+  const url: string = data?.url;
+
+  // Validate the returned URL has a proper https:// scheme
+  if (!url || typeof url !== 'string') {
+    throw new Error('Payment server did not return a checkout URL.');
+  }
+  if (!url.startsWith('https://')) {
+    throw new Error(`Invalid checkout URL received: "${url}"`);
+  }
+
+  // Safe to redirect
+  window.location.href = url;
 }
