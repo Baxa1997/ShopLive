@@ -933,11 +933,11 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 font-sans pt-16">
+    <div className=" min-h-screen flex flex-col bg-slate-50 font-sans pt-24">
       {paywallJsx}
 
-      <header className="mb-1 text-center max-w-4xl mx-auto relative px-4 pt-5">
-        <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter mb-0">
+      <header className="mb-2 text-center max-w-4xl mx-auto relative px-6 pt-2">
+        <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter mb-0.5">
           <span className="text-emerald-600">PDF</span> to {
             activeMarketplace === 'shopify' ? 'Shopify CSV' :
             activeMarketplace === 'amazon' ? 'Amazon Listing' :
@@ -945,7 +945,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
           } Generator
         </h1>
         
-        <p className="text-xl text-slate-500 max-w-5xl mx-auto font-medium leading-relaxed">
+        <p className="text-base text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
           {activeMarketplace === 'shopify' && <>Transform messy supplier data into high-converting <span className="text-emerald-600 font-bold">Shopify CSVs</span> with taxonomy mapping.</>}
           {activeMarketplace === 'amazon' && <>Transform messy supplier data into high-converting <span className="text-orange-500 font-bold">Amazon Listings</span> with SEO bullets.</>}
           {!activeMarketplace && <>Select a destination to start transforming your supplier data into retail-ready assets.</>}
@@ -953,7 +953,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
       </header>
 
 
-      <div className="max-w-2xl mx-auto mb-8 flex-shrink-0 mt-3 px-6 md:px-10">
+      <div className=" max-w-xl mx-auto mb-5 flex-shrink-0 mt-1 px-6">
         <div className="relative">
           {/* Progress Line Background */}
           <div className="absolute top-5 left-[12.5%] w-[75%] h-0.5 bg-slate-100 rounded-full" />
@@ -990,15 +990,15 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
       </div>
 
 
-      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 pb-10 scroll-smooth">
-        <div className="max-w-7xl mx-auto">
+      <main className=" flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 pb-6 scroll-smooth">
+        <div className="max-w-6xl mx-auto">
         
 
         {currentStep === 2 && (
           <div className="flex flex-col lg:flex-row gap-5 w-full transition-all">
 
             {/* ─── LEFT SIDEBAR: Filters & Status ─────────────────────────────── */}
-            <div className="lg:w-72 flex-shrink-0 space-y-3">
+            <div className="lg:w-64 flex-shrink-0 space-y-2.5">
 
               {/* Active Platform Card */}
               <div className={`rounded-2xl p-5 border text-white relative overflow-hidden ${
@@ -1076,7 +1076,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                 )}
               </div>
 
-              {/* Configuration Summary */}
+
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Configuration</p>
@@ -1088,12 +1088,10 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                     <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
                   </button>
                 </div>
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {[
                     { label: 'Output Channel', value: userConfig.targetChannels },
                     { label: 'Default Qty', value: userConfig.defaultQty },
-                    { label: 'Price Markup', value: `${userConfig.priceMarkup}×` },
-                    { label: 'Product Type', value: userConfig.defaultType },
                   ].map((item) => (
                     <div key={item.label} className="flex items-center justify-between">
                       <span className="text-xs text-slate-400 font-medium">{item.label}</span>
@@ -1113,7 +1111,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 
             {/* ─── RIGHT PANEL: Upload & Process ──────────────────────────────── */}
             <div className="flex-1 min-w-0">
-              <div className="bg-white rounded-[2rem] p-8 shadow-2xl border border-slate-100 h-full">
+              <div className="bg-white rounded-[1.75rem] p-6 shadow-2xl border border-slate-100 h-full">
 
                 {/* Input tabs */}
                 <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-6">
@@ -1152,23 +1150,23 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                       />
                       <label
                         htmlFor="file-upload"
-                        className={`flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-[2rem] bg-emerald-50/10 hover:bg-emerald-50/30 transition-all cursor-pointer group h-56 ${
+                        className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-[1.75rem] bg-emerald-50/10 hover:bg-emerald-50/20 transition-all cursor-pointer group h-[260px] ${
                           activeMarketplace
                           ? 'border-emerald-500/30 ring-4 ring-emerald-500/5'
                           : 'border-slate-100'
                         }`}
                       >
-                        <div className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md mb-4 group-hover:scale-110 transition-transform ${activeMarketplace ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          <Upload className="w-8 h-8" />
+                        <div className={`w-14 h-14 bg-white rounded-xl flex items-center justify-center shadow-lg border border-slate-100 mb-4 group-hover:scale-110 transition-transform ${activeMarketplace ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          <Upload className="w-6 h-6" />
                         </div>
-                        <span className="font-bold text-slate-900 text-xl mb-1">
+                        <h3 className="font-heading font-black text-slate-900 text-xl mb-1">
                           {activeMarketplace ? 'Click to Upload' : 'Platform Required'}
-                        </span>
-                        <span className="text-sm text-slate-500 text-center max-w-xs">
+                        </h3>
+                        <p className="text-[13px] text-slate-500 text-center max-w-[280px] font-medium">
                           {activeMarketplace
-                            ? `PDF or Image — we'll extract every product automatically.`
-                            : 'Select your target platform on the left to enable uploading.'}
-                        </span>
+                            ? `PDF, Images or Spreadsheets — we'll extract every product automatically using 2026 AI models.`
+                            : 'Select your target platform on the left to enable architecture processing.'}
+                        </p>
                         {fileName && (
                           <div className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest ring-2 ring-emerald-200 flex items-center gap-2">
                             <Check className="w-3.5 h-3.5" />
