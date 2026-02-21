@@ -1,6 +1,7 @@
 'use client';
 
-import { Package, Mail, Phone, Share2, Twitter, Github } from 'lucide-react';
+import { Package, Mail, Phone, Share2 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function SiteFooter() {
   return (
@@ -30,9 +31,10 @@ export default function SiteFooter() {
           <div className="space-y-4">
             <h3 className="text-white font-heading font-semibold text-lg">Platform</h3>
             <ul className="space-y-2">
-              <li><a href="#" className="hover:text-emerald-400 transition-colors">Home</a></li>
-              <li><a href="#" className="hover:text-emerald-400 transition-colors">All Tools</a></li>
-              <li><a href="#" className="hover:text-emerald-400 transition-colors">Updates</a></li>
+              <li><Link href="/" className="hover:text-emerald-400 transition-colors">Home</Link></li>
+              <li><Link href="/about" className="hover:text-emerald-400 transition-colors">About</Link></li>
+              <li><Link href="/docs" className="hover:text-emerald-400 transition-colors">Documentation</Link></li>
+              <li><Link href="/policy" className="hover:text-emerald-400 transition-colors">Privacy & Terms</Link></li>
             </ul>
           </div>
 

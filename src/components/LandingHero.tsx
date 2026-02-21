@@ -12,18 +12,7 @@ export default function LandingHero() {
 
       <MagicTextTransform />
 
-      <nav className="absolute top-0 left-0 w-full p-6 z-20">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
 
-            <div className="flex items-center gap-2">
-                 <div className="bg-white/80 p-2 rounded-lg backdrop-blur-md border border-emerald-500/10 shadow-sm">
-                    <Package className="w-5 h-5 text-emerald-600" />
-                </div>
-                <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">ShopsReady</span>
-            </div>
-
-        </div>
-      </nav>
 
 
       <div className="max-w-6xl mx-auto text-center relative z-10 mb-2">

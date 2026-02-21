@@ -1,7 +1,8 @@
+import type React from 'react';
 import { Outfit, Inter } from "next/font/google";
-import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import Providers from "@/app/providers";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -23,8 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-
-        <title>ShopsReady | PDF to CSV & Shopify CSV Generator</title>
+        <title>ShopsReady | PDF to CSV &amp; Shopify CSV Generator</title>
         <meta name="description" content="ShopsReady: The fastest way to CSV generate for Shopify and Amazon. Use our AI PDF to CSV tool to automate your e-commerce onboarding in seconds." />
         <meta name="keywords" content="ShopsReady, PDF to CSV, Shopify CSV generator, CSV generate, Amazon inventory" />
         <meta name="author" content="ShopsReady Team" />
@@ -54,7 +54,9 @@ export default function RootLayout({
         />
       </head>
       <body className={`${outfit.variable} ${inter.variable} font-sans antialiased`}>
-        {children}
+        <Providers>
+          {children}
+        </Providers>
         <Analytics />
       </body>
     </html>

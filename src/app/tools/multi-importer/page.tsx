@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X } from 'lucide-react';
+import { Upload, Download, Check, ArrowRight, ArrowLeft, Loader2, FileSpreadsheet, Sparkles, AlertCircle, Package, ShoppingBag, Tag, Settings, X, History, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { saveToHistory } from '@/lib/history';
 
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -80,9 +81,13 @@ const fileToGenerativePart = async (file: File): Promise<any> => {
   });
 };
 
+const FREE_LIMIT = 2; // Free generations per day
+
 export default function ShopifyImporterPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [inputText, setInputText] = useState('');
   const [products, setProducts] = useState<UnifiedProduct[]>([]);
   const [activeAmazonToolId, setActiveAmazonToolId] = useState<string | null>(null);
@@ -92,6 +97,8 @@ export default function ShopifyImporterPage() {
   const [usageCount, setUsageCount] = useState(0);
   const [inputTab, setInputTab] = useState<'upload' | 'manual'>('upload');
   const [isCategorizing, setIsCategorizing] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'pay-per-use' | 'monthly' | null>(null);
 
   // Advanced Configuration State
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -160,7 +167,15 @@ export default function ShopifyImporterPage() {
     }
   };
 
-  const extractData = async (file: File | Blob, apiKey: string, config: typeof userConfig, isConfigConfirmed: boolean): Promise<UnifiedProduct[]> => {
+  // Sends one PDF chunk to Gemini and returns the parsed products.
+  // expectedCount is an estimate used to tell the model how many products to find.
+  const extractData = async (
+    file: File | Blob,
+    apiKey: string,
+    config: typeof userConfig,
+    isConfigConfirmed: boolean,
+    expectedCount?: number
+  ): Promise<UnifiedProduct[]> => {
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const schema = {
@@ -271,18 +286,15 @@ export default function ShopifyImporterPage() {
       },
     });
 
-    // Handle File or Blob casting for fileToGenerativePart
-    // If it's a Blob, we might need to cast it or wrap it in a File object if possible, 
-    // or ensure fileToGenerativePart accepts Blobs. 
-    // fileToGenerativePart reads with FileReader which works on Blobs too.
     const imagePart = await fileToGenerativePart(file as File);
 
     const target_system = config.targetChannels === 'Both' ? ['shopify', 'amazon'] : config.targetChannels.toLowerCase();
+    const countHint = expectedCount ? `\n\nCRITICAL: This chunk is expected to contain approximately ${expectedCount} distinct product(s). You MUST extract ALL of them — do not skip any product, even if the data is sparse. Every unique product name/SKU row in the PDF is a separate product entry.` : '';
 
     const prompt = `Act as a Senior Marketplace Architect. 
 
 Goal: Process product data from PDF for high-integrity export.
-Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(target_system)}).
+Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(target_system)}).${countHint}
 
 1. Dynamic Identity & Vendor Detection:
 - **Source:** Extract brand/manufacturer from PDF logos, headers, or "Brand" fields.
@@ -290,6 +302,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 - **Vendor Logic:** If brand is missing, use the **Supplier/Company name** from the header. Leave blank if no supplier info exists.
 
 2. Product Titles & Metadata (1:1 Extraction):
+- **COMPLETENESS RULE:** You MUST output one JSON object for EVERY distinct product found in the PDF pages. Missing a product is not acceptable.
 - **Titles:** Use the EXACT product titles found in the PDF. No optimization or rewriting. 
 - **B2B Variant Grouping:** If the PDF lists multiple rows for the same product (e.g., different sizes/colors), group them into ONE master product object with a 'variants' array.
 
@@ -304,22 +317,22 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 5. Technical Sync:
 - **Match Score:** Assign a confidence score: 'High' (Exact Match) or 'Medium' (Review Needed).
 
-5. Amazon-Specific Extraction:
+6. Amazon-Specific Extraction:
 - **Bullet Points (Bold Caps):** Extract 5 key features from the PDF and format as BOLD CAPS bullets (e.g., 'DURABLE BUILD: ...'). Do not invent new features.
 - **Search Terms:** Extract 250 characters of keywords based strictly on PDF content.
 
-6. Inventory & Pricing (Scan-First Logic):
+7. Inventory & Pricing (Scan-First Logic):
 - **Stock:** 1. Use exact 'Quantity' or 'Stock' values from PDF if found.
     2. IF MISSING: Use ${config.defaultQty} ONLY IF 'Config Status' is true. 
     3. Otherwise, output '0'. NEVER use placeholder numbers like '100'.
 - **Cost/Markup:** Extract 'Wholesale' price. Multiply by ${config.priceMarkup} ONLY IF 'Config Status' is true.
 
-7. Technical Synchronization:
+8. Technical Synchronization:
 - **Category Sync:** Apply the detected breadcrumb to the 'Standard Product Type' (Shopify) and 'Category/Browse Node' (Amazon) fields.
 - **Handle Logic:** Ensure variants share a single 'Handle' for correct grouping.
 
-8. Output Formatting:
-- Map to ${config.targetChannels} headers. Return ONLY a valid JSON object. No filler data.`;
+9. Output Formatting:
+- Map to ${config.targetChannels} headers. Return ONLY a valid JSON array. No filler data. Include every product.`;
 
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
@@ -335,15 +348,47 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
   };
 
   const handleAnalyze = async () => {
-    if (usageCount >= 5) {
-      alert("Daily Limit Reached (5/5). Please come back tomorrow!");
+    if (usageCount >= FREE_LIMIT) {
+      setShowPaywall(true);
       return;
     }
 
     setIsLoading(true);
     setError('');
+    setLoadingStatus('Initializing...');
+    setLoadingProgress(0);
     
+    // Clear previous products before starting a new analysis
+    setProducts([]);
     let allProducts: UnifiedProduct[] = [];
+
+    // Helper: sleep between API calls to avoid rate limits
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+    // Helper: extract with up to maxRetries attempts on failure
+    const extractWithRetry = async (
+      fileChunk: File,
+      apiKey: string,
+      config: typeof userConfig,
+      isConfigConfirmed: boolean,
+      expectedCount: number,
+      chunkLabel: string,
+      maxRetries = 2
+    ): Promise<UnifiedProduct[]> => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const result = await extractData(fileChunk, apiKey, config, isConfigConfirmed, expectedCount);
+          return result;
+        } catch (err) {
+          console.warn(`Chunk ${chunkLabel} attempt ${attempt} failed:`, err);
+          if (attempt < maxRetries) {
+            await sleep(2000 * attempt); // back-off: 2s, 4s
+          }
+        }
+      }
+      console.error(`Chunk ${chunkLabel} failed after ${maxRetries} attempts. Skipping.`);
+      return [];
+    };
 
     try {
       if (!process.env.NEXT_PUBLIC_GOOGLE_API_KEY) {
@@ -354,52 +399,78 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         const arrayBuffer = await uploadedFile.arrayBuffer();
         const pdfDoc = await PDFDocument.load(arrayBuffer);
         const totalPages = pdfDoc.getPageCount();
-        const batchSize = 10;
+
+        // Use a smaller batch size (5 pages) so the model stays well within
+        // its structured-output token budget and returns ALL products.
+        const batchSize = 5;
+        const totalBatches = Math.ceil(totalPages / batchSize);
         
         let hasProcessedAtLeastOne = false;
+        const seenTitles = new Set<string>(); // deduplication guard
 
-        for (let i = 0; i < totalPages; i += batchSize) {
-          const subDoc = await PDFDocument.create();
-          const pageIndices = [];
-          for (let j = 0; j < batchSize && (i + j) < totalPages; j++) {
-            pageIndices.push(i + j);
+        for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+          const startPage = batchIdx * batchSize;
+          const pageIndices: number[] = [];
+          for (let j = 0; j < batchSize && (startPage + j) < totalPages; j++) {
+            pageIndices.push(startPage + j);
           }
-          
+
+          setLoadingStatus(
+            `Scanning pages ${startPage + 1}–${Math.min(startPage + batchSize, totalPages)} of ${totalPages} (batch ${batchIdx + 1}/${totalBatches})…`
+          );
+          setLoadingProgress(Math.round(((batchIdx) / totalBatches) * 80));
+
+          const subDoc = await PDFDocument.create();
           const copiedPages = await subDoc.copyPages(pdfDoc, pageIndices);
           copiedPages.forEach((page: any) => subDoc.addPage(page));
-          
           const pdfBytes = await subDoc.save();
           const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
-          const fileChunk = new File([blob], `chunk_${i}.pdf`, { type: 'application/pdf' });
+          const fileChunk = new File([blob], `chunk_${startPage}.pdf`, { type: 'application/pdf' });
 
-          try {
-            const chunkProducts = await extractData(fileChunk, process.env.NEXT_PUBLIC_GOOGLE_API_KEY, userConfig, isConfigConfirmed);
-            setProducts(prev => [...prev, ...chunkProducts]);
-            allProducts = [...allProducts, ...chunkProducts]; // Accumulate
+          const chunkLabel = `pages ${startPage + 1}-${Math.min(startPage + batchSize, totalPages)}`;
+          const chunkProducts = await extractWithRetry(
+            fileChunk,
+            process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
+            userConfig,
+            isConfigConfirmed,
+            pageIndices.length * 3, // rough upper bound: ~3 products per page
+            chunkLabel
+          );
+
+          if (chunkProducts.length > 0) {
+            // Deduplicate by title to prevent duplicates across chunks
+            const uniqueChunk = chunkProducts.filter(p => {
+              const key = p.shopify_service?.title?.trim().toLowerCase();
+              if (!key || seenTitles.has(key)) return false;
+              seenTitles.add(key);
+              return true;
+            });
+
+            allProducts = [...allProducts, ...uniqueChunk];
+            // Update UI progressively so user sees results arriving
+            setProducts([...allProducts]);
             hasProcessedAtLeastOne = true;
-          } catch (chunkErr) {
-            console.error(`Error processing chunk ${i}-${i+batchSize}:`, chunkErr);
           }
 
-          await new Promise(r => setTimeout(r, 200));
+          // Respectful delay between batches to avoid rate-limiting
+          if (batchIdx < totalBatches - 1) {
+            await sleep(1500);
+          }
         }
         
-        if (hasProcessedAtLeastOne) {
-          // Logic moved to end of function
-        } else {
-           throw new Error("Failed to process any pages in the PDF.");
+        if (!hasProcessedAtLeastOne) {
+          throw new Error("Failed to extract any products from the PDF. Please check that the file contains product data.");
         }
 
       } else if (uploadedFile && uploadedFile.type.includes('image')) {
-        
-        const products = await extractData(uploadedFile, process.env.NEXT_PUBLIC_GOOGLE_API_KEY, userConfig, isConfigConfirmed);
-        
-        allProducts = products;
-        setProducts(products);
-        // setCurrentStep(3); -> Moved to end
+        setLoadingStatus('Analyzing image...');
+        const extracted = await extractData(uploadedFile, process.env.NEXT_PUBLIC_GOOGLE_API_KEY, userConfig, isConfigConfirmed);
+        allProducts = extracted;
+        setProducts(extracted);
 
       } else {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        setLoadingStatus('Generating sample data...');
+        await sleep(2000);
         const mockProducts: UnifiedProduct[] = [
           {
             sync_id: 'URB-DENIM-NAVY-M',
@@ -446,7 +517,7 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                 ]
               },
               search_terms: 'denim jacket blue outerwear men fashion rugged classic gift daily wear worker style',
-              rufus_summary: 'This Urban Threads denim jacket is the ideal blend of durability and comfort for craftsmen and urban explorers. It features reinforced denim perfect for spring or autumn layering, answering the need for a long-lasting, stylish outer layer.'
+              rufus_summary: 'This Urban Threads denim jacket is the ideal blend of durability and comfort for craftsmen and urban explorers. It features reinforced denim perfect for spring or autumn lastspring layering, answering the need for a long-lasting, stylish outer layer.'
             },
             aplus_content_service: {
               modules: [
@@ -471,13 +542,27 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         setUsageCount(newCount);
         localStorage.setItem('import_count', newCount.toString());
 
-        // Run categorization BEFORE showing review page
+        setLoadingStatus(`Categorizing ${allProducts.length} products with AI…`);
+        setLoadingProgress(85);
+        // Run smart categorization BEFORE showing the review page
         const categorizedProducts = await handleSmartCategorization(allProducts);
         
-        // Only show review page after categorization is complete
+        // Save to history
+        setLoadingProgress(95);
+        saveToHistory({
+          fileName: fileName || 'Manual Entry',
+          marketplace: (activeMarketplace as any) || 'shopify',
+          productCount: categorizedProducts.length,
+          products: categorizedProducts,
+        });
+
         setProducts(categorizedProducts);
         setCurrentStep(3);
+        setLoadingProgress(100);
+        setLoadingStatus('');
         setIsLoading(false);
+      } else {
+        throw new Error('No products were extracted. Please try a different file.');
       }
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -485,7 +570,9 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
         console.error('API Error Response:', err.response);
       }
       setError(err.message || 'Failed to analyze. Please try again.');
-        setIsLoading(false);
+      setLoadingStatus('');
+      setLoadingProgress(0);
+      setIsLoading(false);
     }
   };
 
@@ -738,49 +825,119 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
     sessionStorage.removeItem('target_system');
   };
 
-  return (
-    <div className="h-[100dvh] flex flex-col bg-slate-50 font-sans overflow-hidden">
-
-      <div className="flex flex-col md:flex-row items-center justify-between max-w-7xl w-full mx-auto px-8 py-4 gap-6 border-b border-slate-100 flex-shrink-0">
-        <Link href="/" className="flex items-center gap-2 group cursor-pointer order-1 md:order-none">
-          <div className="bg-emerald-600/10 p-2.5 rounded-2xl backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all shadow-sm">
-            <Package className="w-6 h-6 text-emerald-600" />
-          </div>
-          <span className="font-heading font-black text-2xl text-slate-900 tracking-tighter">ShopsReady</span>
-        </Link>
-        
-        {activeMarketplace && (
-          <div className="flex items-center gap-3 order-3 md:order-none animate-in fade-in zoom-in duration-500">
-            <div className={`pl-1.5 pr-4 py-1.5 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center gap-3 border shadow-sm transition-all ${
-              activeMarketplace === 'shopify' ? 'bg-[#95BF47] text-white border-[#84ab3c] shadow-emerald-200' :
-              'bg-[#FF9900] text-white border-[#e68a00] shadow-orange-200'
-            }`}>
-              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-                {activeMarketplace === 'shopify' ? <img src="/shopifyLogo.png" className="w-5 h-5 object-contain brightness-0 invert" alt="" /> : <img src="/amazonLogo.png" className="w-5 h-5 object-contain brightness-0 invert" alt="" />}
+  // ─── Paywall Modal ────────────────────────────────────────────────────────────
+  // Inline paywall JSX (not a component) to prevent re-mounting on plan selection
+  const paywallJsx = (
+    <AnimatePresence>
+      {showPaywall && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowPaywall(false); }}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.88, y: 24 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.88, y: 24 }}
+            transition={{ type: 'spring', damping: 22, stiffness: 280 }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 p-7 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/4" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/10 rounded-full translate-y-1/2 -translate-x-1/4" />
+              <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all">
+                <X className="w-4 h-4" />
+              </button>
+              <div className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                <Zap className="w-6 h-6 text-amber-900" />
               </div>
-              Architect Active: {activeMarketplace.toUpperCase()}
+              <h2 className="text-2xl font-black tracking-tight mb-1">Free limit reached</h2>
+              <p className="text-white/60 text-sm">You've used your {FREE_LIMIT} free generations today. Choose a plan to keep going.</p>
             </div>
-            
-            <button 
-              onClick={handleStartOver}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 hover:text-red-600 hover:border-red-200 hover:shadow-lg hover:shadow-red-500/10 transition-all cursor-pointer shadow-sm group"
-            >
-              <X className="w-4 h-4 transition-transform group-hover:rotate-90" />
-              RESET
-            </button>
-          </div>
-        )}
 
-        <div className="flex items-center gap-3 px-5 py-2.5 bg-white rounded-2xl border border-slate-200 shadow-sm order-2 md:order-none">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[12px] font-black text-slate-700 uppercase tracking-widest">
-            {5 - usageCount} Architectures Ready
-          </span>
-        </div>
-      </div>
+            {/* Plans */}
+            <div className="p-6 space-y-3">
+              {/* Pay-per-use */}
+              <button
+                onClick={() => setSelectedPlan('pay-per-use')}
+                className={`w-full p-4 rounded-2xl border-2 text-left transition-all group ${
+                  selectedPlan === 'pay-per-use'
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
+                      selectedPlan === 'pay-per-use' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>⚡</div>
+                    <span className="font-bold text-slate-900">Pay Per Generation</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-slate-900">$1</span>
+                    <span className="text-xs text-slate-400 ml-1">/ run</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 pl-10">One-time payment. Process any PDF once (no page limit), download immediately.</p>
+              </button>
 
-      <header className="mb-2 text-center max-w-4xl mx-auto relative px-4 mt-4">
-        <h1 className="text-4xl md:text-4xl font-black text-slate-900 tracking-tighter mb-0">
+              {/* Monthly */}
+              <button
+                onClick={() => setSelectedPlan('monthly')}
+                className={`w-full p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden ${
+                  selectedPlan === 'monthly'
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                }`}
+              >
+                <div className="absolute top-3 right-3">
+                  <span className="bg-emerald-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wide">Best Value</span>
+                </div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
+                      selectedPlan === 'monthly' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>👑</div>
+                    <span className="font-bold text-slate-900">Monthly Pro</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-slate-900">$9.99</span>
+                    <span className="text-xs text-slate-400 ml-1">/ month</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 pl-10">Unlimited generations (no limit) · Priority AI · Full history · Bulk exports</p>
+              </button>
+
+              {/* CTA */}
+              <button
+                disabled={!selectedPlan}
+                onClick={() => {
+                  // In a real app, integrate Stripe here
+                  setShowPaywall(false);
+                }}
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Zap className="w-4 h-4" />
+                {selectedPlan === 'monthly' ? 'Subscribe for $9.99/mo' : selectedPlan === 'pay-per-use' ? 'Pay $1 & Continue' : 'Select a Plan'}
+              </button>
+
+              <p className="text-center text-xs text-slate-400">Secure checkout · Cancel anytime · Instant access</p>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  return (
+    <div className="min-h-screen flex flex-col bg-slate-50 font-sans pt-16">
+      {paywallJsx}
+
+      <header className="mb-1 text-center max-w-4xl mx-auto relative px-4 pt-5">
+        <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter mb-0">
           <span className="text-emerald-600">PDF</span> to {
             activeMarketplace === 'shopify' ? 'Shopify CSV' :
             activeMarketplace === 'amazon' ? 'Amazon Listing' :
@@ -796,38 +953,36 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
       </header>
 
 
-      <div className="w-4xl mx-auto mb-12 flex-shrink-1 mt-4 px-12">
+      <div className="max-w-2xl mx-auto mb-8 flex-shrink-0 mt-3 px-6 md:px-10">
         <div className="relative">
           {/* Progress Line Background */}
-          <div className="absolute top-6 left-[12.5%] w-[75%] h-[3px] bg-slate-100 -z-10 rounded-full" />
+          <div className="absolute top-5 left-[12.5%] w-[75%] h-0.5 bg-slate-100 rounded-full" />
           {/* Active Progress Line */}
-          <div 
-            className="absolute top-6 left-[12.5%] h-[3px] bg-emerald-600 transition-all duration-700 ease-out -z-10 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.3)]" 
+          <div
+            className="absolute top-5 left-[12.5%] h-0.5 bg-emerald-600 transition-all duration-700 ease-out rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]"
             style={{ width: `${Math.min(((currentStep - 1) / 3) * 75, 75)}%` }}
           />
-          
-          <div className="flex justify-between items-center w-full mb-4">
+
+          <div className="flex justify-between items-start w-full">
             {[
               { num: 1, label: 'Target Platform' },
               { num: 2, label: 'Upload Catalog' },
               { num: 3, label: 'Smart Processing' },
               { num: 4, label: 'Export Ready' }
             ].map((step) => (
-              <div key={step.num} className="flex-1 relative flex flex-col items-center">
+              <div key={step.num} className="flex-1 flex flex-col items-center gap-2">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs transition-all duration-500 z-10 ${
-                  currentStep > step.num ? 'bg-emerald-600 text-white shadow-lg scale-110' :
-                  currentStep === step.num ? 'bg-emerald-600 text-white ring-8 ring-emerald-50 shadow-emerald-100 shadow-xl' :
+                  currentStep > step.num ? 'bg-emerald-600 text-white shadow-lg scale-105' :
+                  currentStep === step.num ? 'bg-emerald-600 text-white ring-4 ring-emerald-100 shadow-lg shadow-emerald-100' :
                   'bg-white text-slate-300 border-2 border-slate-100'
                 }`}>
-                  {currentStep > step.num ? <Check className="w-6 h-6" strokeWidth={3} /> : step.num}
+                  {currentStep > step.num ? <Check className="w-5 h-5" strokeWidth={3} /> : step.num}
                 </div>
-                <div className="absolute top-16 left-1/2 -ml-20 w-40 text-center">
-                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap block transition-all duration-300 ${
-                    currentStep >= step.num ? 'text-emerald-900 translate-y-0 opacity-100' : 'text-slate-400 translate-y-1 opacity-60'
-                  }`}>
-                    {step.label}
-                  </span>
-                </div>
+                <span className={`text-[9px] font-black uppercase tracking-widest text-center leading-tight transition-all duration-300 ${
+                  currentStep >= step.num ? 'text-emerald-800 opacity-100' : 'text-slate-400 opacity-60'
+                }`}>
+                  {step.label}
+                </span>
               </div>
             ))}
           </div>
@@ -835,136 +990,271 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
       </div>
 
 
-      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-10 pb-12 scroll-smooth">
-        <div className="max-w-5xl mx-auto">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 pb-10 scroll-smooth">
+        <div className="max-w-7xl mx-auto">
         
 
         {currentStep === 2 && (
-          <div className="bg-white rounded-[2rem] p-8 shadow-2xl border border-slate-100 max-w-3xl mx-auto transition-all">
-            <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-4">
-              <button
-                onClick={() => setInputTab('upload')}
-                className={`flex-1 cursor-pointer flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${
-                  inputTab === 'upload' 
-                  ? 'bg-white text-emerald-600 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Upload className="w-4 h-4" /> Upload Catalog
-              </button>
-              <button
-                onClick={() => setInputTab('manual')}
-                className={`flex-1 cursor-pointer flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${
-                  inputTab === 'manual' 
-                  ? 'bg-white text-emerald-600 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <FileSpreadsheet className="w-4 h-4" /> Manual Entry
-              </button>
-            </div>
+          <div className="flex flex-col lg:flex-row gap-5 w-full transition-all">
 
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              {inputTab === 'upload' ? (
-                  <div className={`relative w-full ${!activeMarketplace ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                    <input
-                      type="file"
-                      accept=".txt,.csv,.pdf,image/*"
-                      onChange={handleFileUpload}
-                      disabled={!activeMarketplace}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                      id="file-upload"
-                    />
-                    <label 
-                      htmlFor="file-upload"
-                      className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-[2rem] bg-emerald-50/10 hover:bg-emerald-50/30 transition-all cursor-pointer group h-52 ${
-                        activeMarketplace 
-                        ? 'border-emerald-500/30 ring-4 ring-emerald-500/5' 
-                        : 'border-slate-100'
-                      }`}
-                    >
-                      <div className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md mb-4 group-hover:scale-110 transition-transform ${activeMarketplace ? 'text-emerald-600' : 'text-slate-400'}`}>
-                        <Upload className="w-8 h-8" />
-                      </div>
-                      <span className="font-bold text-slate-900 text-xl mb-1">
-                        {activeMarketplace ? 'Click to Upload' : 'Platform Required'}
-                      </span>
-                      <span className="text-sm text-slate-500 text-center max-w-xs">
-                        {activeMarketplace 
-                          ? `Attach a PDF or Image for ${activeMarketplace.toUpperCase()} organization.`
-                          : 'Please select your target platform above to enable uploading.'}
-                      </span>
-                      {fileName && (
-                        <div className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest ring-2 ring-emerald-200 animate-bounce">
-                          {fileName}
-                        </div>
-                      )}
-                    </label>
+            {/* ─── LEFT SIDEBAR: Filters & Status ─────────────────────────────── */}
+            <div className="lg:w-72 flex-shrink-0 space-y-3">
+
+              {/* Active Platform Card */}
+              <div className={`rounded-2xl p-5 border text-white relative overflow-hidden ${
+                activeMarketplace === 'shopify'
+                  ? 'bg-gradient-to-br from-[#5a8a1f] to-[#95BF47] border-[#84ab3c]'
+                  : activeMarketplace === 'amazon'
+                  ? 'bg-gradient-to-br from-[#c47800] to-[#FF9900] border-[#e68a00]'
+                  : 'bg-gradient-to-br from-slate-700 to-slate-600 border-slate-500'
+              }`}>
+                <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/4" />
+                <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mb-2">Active Platform</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    {activeMarketplace === 'shopify' && <img src="/shopifyLogo.png" className="w-6 h-6 object-contain brightness-0 invert" alt="" />}
+                    {activeMarketplace === 'amazon' && <img src="/amazonLogo.png" className="w-6 h-6 object-contain brightness-0 invert" alt="" />}
+                    {!activeMarketplace && <Package className="w-5 h-5 text-white/70" />}
                   </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className={`relative group ${!activeMarketplace ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                    <textarea
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      disabled={!activeMarketplace}
-                      placeholder={activeMarketplace ? "Example: Blue Shirt, Size M, SKU: 123, Price: $15.00\nRed Jacket, Size L, SKU: 456, Price: $45.00" : "Please select a target platform first."}
-                      className="w-full min-h-[220px] p-6 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-emerald-500 focus:outline-none focus:bg-white transition-all resize-none font-mono text-sm text-slate-700 shadow-inner group-hover:border-slate-300 disabled:cursor-not-allowed"
-                    />
-                    <div className="absolute bottom-4 right-4 opacity-30 group-hover:opacity-100 transition-opacity">
-                      <Sparkles className="w-5 h-5 text-emerald-500" />
-                    </div>
+                  <div>
+                    <p className="font-black text-base leading-tight">
+                      {activeMarketplace === 'shopify' ? 'Shopify Architect' : activeMarketplace === 'amazon' ? 'Amazon Architect' : 'No Platform'}
+                    </p>
+                    <p className="text-white/60 text-xs">{activeMarketplace ? 'Ready to process' : 'Select below'}</p>
                   </div>
                 </div>
-              )}
+                {activeMarketplace && (
+                  <button
+                    onClick={handleStartOver}
+                    className="mt-4 w-full flex items-center justify-center gap-2 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white/80 hover:text-white text-xs font-bold transition-all"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Switch Platform
+                  </button>
+                )}
+              </div>
+
+              {/* Usage Quota Meter */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Daily Quota</p>
+                  <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                    usageCount >= FREE_LIMIT ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {usageCount >= FREE_LIMIT ? 'Limit Reached' : `${FREE_LIMIT - usageCount} Left`}
+                  </span>
+                </div>
+                {/* Segmented bar */}
+                <div className="flex gap-1.5 mb-3">
+                  {Array.from({ length: FREE_LIMIT }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-2.5 flex-1 rounded-full transition-all ${
+                        i < usageCount ? 'bg-emerald-500' : 'bg-slate-100 border border-slate-200'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400 mb-3">
+                  {usageCount} of {FREE_LIMIT} free generations used today.
+                </p>
+                {usageCount >= FREE_LIMIT ? (
+                  <button
+                    onClick={() => setShowPaywall(true)}
+                    className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-xs font-black rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-2"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Unlock More · from $1
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowPaywall(true)}
+                    className="w-full py-2 border border-dashed border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-600 text-xs font-bold rounded-xl transition-all"
+                  >
+                    Upgrade for Unlimited
+                  </button>
+                )}
+              </div>
+
+              {/* Configuration Summary */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Configuration</p>
+                  <button
+                    onClick={() => setIsConfigModalOpen(true)}
+                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all group"
+                    title="Edit Configuration"
+                  >
+                    <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
+                  </button>
+                </div>
+                <div className="space-y-2.5">
+                  {[
+                    { label: 'Output Channel', value: userConfig.targetChannels },
+                    { label: 'Default Qty', value: userConfig.defaultQty },
+                    { label: 'Price Markup', value: `${userConfig.priceMarkup}×` },
+                    { label: 'Product Type', value: userConfig.defaultType },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400 font-medium">{item.label}</span>
+                      <span className="text-xs text-slate-900 font-bold bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 max-w-[120px] truncate text-right">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+                {isConfigConfirmed && (
+                  <div className="mt-3 flex items-center gap-1.5 text-emerald-600 text-xs font-bold">
+                    <Check className="w-3.5 h-3.5" />
+                    Config confirmed
+                  </div>
+                )}
+              </div>
+
             </div>
 
-            {error && (
-              <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-700 text-sm font-medium mt-6">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+            {/* ─── RIGHT PANEL: Upload & Process ──────────────────────────────── */}
+            <div className="flex-1 min-w-0">
+              <div className="bg-white rounded-[2rem] p-8 shadow-2xl border border-slate-100 h-full">
 
-            <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-6">
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setIsConfigModalOpen(true)}
-                  className="px-4 cursor-pointer bg-white border-2 border-slate-200 text-slate-600 rounded-2xl hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center group relative overflow-hidden "
-                  title="Advanced Configurations"
-                >
-                  <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
-                  <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
-                </button>
-                <button
-                  onClick={handleAnalyze}
-                  disabled={isLoading || (inputTab === 'upload' ? !fileName : !inputText.trim())}
-                  className="flex-1 cursor-pointer py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-3xl shadow-xl shadow-emerald-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-4 text-xl group"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-6 h-6 animate-spin" /> 
-                      {isCategorizing ? 'AI Categorizing Products...' : 'Processing Catalog...'}
-                    </>
+                {/* Input tabs */}
+                <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-6">
+                  <button
+                    onClick={() => setInputTab('upload')}
+                    className={`flex-1 cursor-pointer flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${
+                      inputTab === 'upload'
+                      ? 'bg-white text-emerald-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <Upload className="w-4 h-4" /> Upload Catalog
+                  </button>
+                  <button
+                    onClick={() => setInputTab('manual')}
+                    className={`flex-1 cursor-pointer flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${
+                      inputTab === 'manual'
+                      ? 'bg-white text-emerald-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <FileSpreadsheet className="w-4 h-4" /> Manual Entry
+                  </button>
+                </div>
+
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  {inputTab === 'upload' ? (
+                    <div className={`relative w-full ${!activeMarketplace ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      <input
+                        type="file"
+                        accept=".txt,.csv,.pdf,image/*"
+                        onChange={handleFileUpload}
+                        disabled={!activeMarketplace}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                        id="file-upload"
+                      />
+                      <label
+                        htmlFor="file-upload"
+                        className={`flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-[2rem] bg-emerald-50/10 hover:bg-emerald-50/30 transition-all cursor-pointer group h-56 ${
+                          activeMarketplace
+                          ? 'border-emerald-500/30 ring-4 ring-emerald-500/5'
+                          : 'border-slate-100'
+                        }`}
+                      >
+                        <div className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md mb-4 group-hover:scale-110 transition-transform ${activeMarketplace ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          <Upload className="w-8 h-8" />
+                        </div>
+                        <span className="font-bold text-slate-900 text-xl mb-1">
+                          {activeMarketplace ? 'Click to Upload' : 'Platform Required'}
+                        </span>
+                        <span className="text-sm text-slate-500 text-center max-w-xs">
+                          {activeMarketplace
+                            ? `PDF or Image — we'll extract every product automatically.`
+                            : 'Select your target platform on the left to enable uploading.'}
+                        </span>
+                        {fileName && (
+                          <div className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest ring-2 ring-emerald-200 flex items-center gap-2">
+                            <Check className="w-3.5 h-3.5" />
+                            {fileName}
+                          </div>
+                        )}
+                      </label>
+                    </div>
                   ) : (
-                    <>
-                      <Sparkles className="w-6 h-6" /> Start Processing
-                    </>
+                    <div className="space-y-4">
+                      <div className={`relative group ${!activeMarketplace ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <textarea
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          disabled={!activeMarketplace}
+                          placeholder={activeMarketplace ? "Example: Blue Shirt, Size M, SKU: 123, Price: $15.00\nRed Jacket, Size L, SKU: 456, Price: $45.00" : "Please select a target platform first."}
+                          className="w-full min-h-[220px] p-6 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-emerald-500 focus:outline-none focus:bg-white transition-all resize-none font-mono text-sm text-slate-700 shadow-inner group-hover:border-slate-300 disabled:cursor-not-allowed"
+                        />
+                        <div className="absolute bottom-4 right-4 opacity-30 group-hover:opacity-100 transition-opacity">
+                          <Sparkles className="w-5 h-5 text-emerald-500" />
+                        </div>
+                      </div>
+                    </div>
                   )}
-                </button>
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-700 text-sm font-medium mt-6">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                {/* Process Button */}
+                <div className="mt-6 pt-5 border-t border-slate-100 flex flex-col gap-4">
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={isLoading || (inputTab === 'upload' ? !fileName : !inputText.trim())}
+                    className={`w-full cursor-pointer py-4 font-black rounded-3xl shadow-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-1.5 text-xl relative overflow-hidden ${
+                      usageCount >= FREE_LIMIT
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-orange-100 hover:from-amber-600 hover:to-orange-600 text-white'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                          <span className="truncate max-w-[280px] text-base font-bold">{loadingStatus || (isCategorizing ? 'AI Categorizing Products...' : 'Processing Catalog...')}</span>
+                        </>
+                      ) : usageCount >= FREE_LIMIT ? (
+                        <>
+                          <Zap className="w-6 h-6" />
+                          Unlock & Process ($1 or $9.99/mo)
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-6 h-6" />
+                          Start Processing
+                        </>
+                      )}
+                    </div>
+                    {isLoading && loadingProgress > 0 && (
+                      <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden mt-1">
+                        <motion.div
+                          className="h-full bg-white rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${loadingProgress}%` }}
+                          transition={{ duration: 0.4, ease: 'easeOut' }}
+                        />
+                      </div>
+                    )}
+                  </button>
+
+                  {usageCount < FREE_LIMIT && (
+                    <p className="text-center text-xs text-slate-400 font-medium">
+                      {FREE_LIMIT - usageCount} free {FREE_LIMIT - usageCount === 1 ? 'generation' : 'generations'} remaining today
+                    </p>
+                  )}
+                </div>
               </div>
-              
-              <button 
-                onClick={() => setCurrentStep(1)}
-                className="text-center w-full text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-emerald-600 transition-colors"
-              >
-                ← Back to Target Platform
-              </button>
-              
-              {/* Count moved to top nav for better visibility */}
             </div>
           </div>
         )}
+
+
 
 
 

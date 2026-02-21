@@ -1,12 +1,21 @@
 'use client';
 
-import { Check, Package, Sparkles, ArrowRight } from 'lucide-react';
+import { Check, Package, Sparkles, ArrowRight, Zap, Crown } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 export default function PricingPage() {
+  const router = useRouter();
+
+  const handleSelectPlan = (plan: string) => {
+    // In a real app, this would trigger checkout
+    // For now, we navigate to the generator as requested
+    router.push('/tools/multi-importer');
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden font-sans selection:bg-emerald-500/30">
+    <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden font-sans selection:bg-emerald-500/30 pt-20">
       
       {/* Background Ambience */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -14,69 +23,116 @@ export default function PricingPage() {
         <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px]" />
       </div>
 
-      <header className="relative z-10 px-6 py-6 flex justify-between items-center max-w-7xl mx-auto w-full">
-         <Link href="/" className="flex items-center gap-2 group cursor-pointer">
-            <div className="bg-emerald-600/10 p-2 rounded-lg backdrop-blur-md border border-emerald-600/20 group-hover:bg-emerald-600/20 transition-all">
-                <Package className="w-5 h-5 text-emerald-600" />
-            </div>
-            <span className="font-heading font-bold text-xl text-slate-900 tracking-tight">ShopsReady</span>
-          </Link>
-      </header>
+      <div className="relative z-10 max-w-5xl mx-auto px-6 py-12 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-16"
+          >
+            <h1 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tighter mb-4">
+              Simple, <span className="text-emerald-600">Transparent</span> Pricing
+            </h1>
+            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
+              Choose the plan that fits your business needs. No hidden fees, no complexity.
+            </p>
+          </motion.div>
 
-      <main className="flex-grow flex items-center justify-center p-4 relative z-10">
-        <div className="max-w-md w-full">
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="relative rounded-3xl p-1 bg-gradient-to-b from-emerald-500 via-emerald-500/20 to-slate-200"
-            >
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-teal-400 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg shadow-emerald-500/20 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> Most Popular
-                </div>
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              {/* Pay Per Generation */}
+              <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-xl shadow-slate-200/50 flex flex-col"
+              >
+                  <div className="mb-8">
+                      <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-6">
+                          <Zap className="w-6 h-6 text-slate-600" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">Pay Per Use</h3>
+                      <div className="flex items-baseline gap-1 mb-4">
+                          <span className="text-4xl font-black text-slate-900">$1</span>
+                          <span className="text-slate-500 font-medium">/ generation</span>
+                      </div>
+                      <p className="text-slate-500 text-sm">Perfect for occasional imports and small catalogs.</p>
+                  </div>
 
-                <div className="bg-slate-900 backdrop-blur-xl rounded-[1.4rem] p-8 h-full flex flex-col border border-white/10 relative overflow-hidden shadow-2xl">
-                    {/* Inner Glow */}
-                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none" />
+                  <div className="space-y-4 mb-10 flex-grow">
+                      {[
+                          'No PDF page limit',
+                          'Full Shopify/Amazon mapping',
+                          'Download CSV instantly',
+                          'AI Field extraction',
+                          'Technical Support'
+                      ].map((feature) => (
+                          <div key={feature} className="flex items-center gap-3 text-slate-600">
+                              <Check className="w-4 h-4 text-emerald-500" strokeWidth={3} />
+                              <span className="text-sm font-medium">{feature}</span>
+                          </div>
+                      ))}
+                  </div>
 
-                    <div className="relative z-10 text-center mb-8">
-                        <h2 className="text-xl text-emerald-400 font-bold uppercase tracking-widest mb-2">Pro Version</h2>
-                        <div className="flex items-end justify-center gap-1 mb-4">
-                            <span className="text-5xl font-extrabold text-white">$0</span>
-                            <span className="text-slate-500 font-medium mb-1 line-through text-lg opacity-60">$29</span>
-                            <span className="text-slate-400 font-medium mb-1 ml-1">/mo</span>
-                        </div>
-                        <p className="text-slate-400 text-sm">Limited time offer. Get full access to all AI tools completely free.</p>
-                    </div>
+                  <button 
+                    onClick={() => handleSelectPlan('pay-per-use')}
+                    className="w-full py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition-all group"
+                  >
+                      Get Started <ArrowRight className="w-4 h-4 inline-block ml-2 group-hover:translate-x-1 transition-transform" />
+                  </button>
+              </motion.div>
 
-                    <div className="space-y-4 mb-8 flex-grow">
-                        {[
-                            'Unlimited AI Generations',
-                            'Access to UI Architect',
-                            'No Watermark',
-                            'Priority Support',
-                            'Early Access to New Tools'
-                        ].map((feature) => (
-                            <div key={feature} className="flex items-center gap-3 text-slate-300">
-                                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                                    <Check className="w-3 h-3 text-emerald-400" />
-                                </div>
-                                <span className="text-sm">{feature}</span>
-                            </div>
-                        ))}
-                    </div>
+              {/* Monthly Pro */}
+              <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="relative rounded-[2.5rem] p-1 bg-gradient-to-b from-emerald-500 to-emerald-700 shadow-2xl shadow-emerald-200/50"
+              >
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-emerald-900 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-xl">
+                      <Sparkles className="w-3 h-3 text-amber-400" /> Most Popular
+                  </div>
 
-                    <button className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold text-lg transition-all duration-300 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 relative z-10 group cursor-pointer">
-                        <span className="flex items-center justify-center gap-2">
-                             Get Started Now <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </span>
-                    </button>
-                    
-                    <p className="text-center text-xs text-slate-600 mt-4">No credit card required</p>
-                </div>
-            </motion.div>
-        </div>
-      </main>
+                  <div className="bg-white rounded-[2.3rem] p-8 h-full flex flex-col">
+                      <div className="mb-8">
+                          <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6">
+                              <Crown className="w-6 h-6 text-emerald-600" />
+                          </div>
+                          <h3 className="text-xl font-bold text-slate-900 mb-2">Monthly Pro</h3>
+                          <div className="flex items-baseline gap-1 mb-4">
+                              <span className="text-4xl font-black text-slate-900">$9.99</span>
+                              <span className="text-slate-500 font-medium">/ month</span>
+                          </div>
+                          <p className="text-slate-500 text-sm">Unlimited power for growing e-commerce teams.</p>
+                      </div>
+
+                      <div className="space-y-4 mb-10 flex-grow">
+                          {[
+                              'Unlimited generations (no limit)',
+                              'Priority AI processing',
+                              'Unlimited history storage',
+                              'Bulk exports (Sync Package)',
+                              'Priority Support'
+                          ].map((feature) => (
+                              <div key={feature} className="flex items-center gap-3 text-slate-600">
+                                  <Check className="w-4 h-4 text-emerald-500" strokeWidth={3} />
+                                  <span className="text-sm font-bold">{feature}</span>
+                              </div>
+                          ))}
+                      </div>
+
+                      <button 
+                        onClick={() => handleSelectPlan('monthly')}
+                        className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black transition-all shadow-lg shadow-emerald-100 group"
+                      >
+                          Go Pro Now <ArrowRight className="w-4 h-4 inline-block ml-2 group-hover:translate-x-1 transition-transform" />
+                      </button>
+                  </div>
+              </motion.div>
+          </div>
+          
+          <p className="mt-12 text-slate-400 text-sm">
+            All plans include standard updates and secure cloud processing.
+          </p>
+      </div>
 
     </div>
   );
