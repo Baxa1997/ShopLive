@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { type User } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
@@ -43,12 +44,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // 2. Listen for auth changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const previousUser = user;
       setUser(session?.user ?? null);
+      
       if (session?.user) {
         fetchProfile(session.user.id);
+        if (event === 'SIGNED_IN') {
+          toast.success('Successfully signed in!');
+        }
       } else {
         setIsPro(false);
+        if (event === 'SIGNED_OUT') {
+          toast.success('Successfully signed out!');
+        }
       }
       setIsLoading(false);
     });

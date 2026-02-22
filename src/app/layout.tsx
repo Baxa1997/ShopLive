@@ -1,6 +1,7 @@
 import type React from 'react';
 import { Outfit, Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { Toaster } from "sonner";
 import "./globals.css";
 import Providers from "@/app/providers";
 
@@ -24,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <title>ShopsReady | PDF to CSV &amp; Shopify CSV Generator</title>
+        <title>ShopsReady | PDF to CSV & Shopify CSV Generator</title>
         <meta name="description" content="ShopsReady: The fastest way to CSV generate for Shopify and Amazon. Use our AI PDF to CSV tool to automate your e-commerce onboarding in seconds." />
         <meta name="keywords" content="ShopsReady, PDF to CSV, Shopify CSV generator, CSV generate, Amazon inventory" />
         <meta name="author" content="ShopsReady Team" />
@@ -58,6 +59,7 @@ export default function RootLayout({
           {children}
         </Providers>
         <Analytics />
+        <Toaster position="top-center" richColors />
       </body>
     </html>
   );
