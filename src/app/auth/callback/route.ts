@@ -11,14 +11,18 @@ export async function GET(request: Request) {
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/tools/multi-importer';
 
+  // Use the configured site URL so redirects always go to the production domain,
+  // not to localhost (which can happen behind reverse proxies / load balancers).
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin;
+
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${siteUrl}${next}`);
     }
   }
 
   console.error('Auth callback error: missing code or exchange failed');
-  return NextResponse.redirect(`${origin}/?auth_error=true`);
+  return NextResponse.redirect(`${siteUrl}/?auth_error=true`);
 }
