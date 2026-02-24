@@ -1,6 +1,6 @@
 
 
-export type StripePlan = 'pay_per_use' | 'pro_monthly';
+export type StripePlan = 'standard' | 'pro' | 'ultra';
 
 const STRIPE_API_BASE = 'https://api.shopsready.com/api/v1';
 

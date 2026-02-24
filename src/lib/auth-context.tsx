@@ -5,11 +5,14 @@ import { type User } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 
+export type UserPlan = 'free' | 'standard' | 'pro' | 'ultra';
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
-  isPro: boolean;
+  isPro: boolean;       // true for any paid plan (standard, pro, ultra) — backward compat
+  userPlan: UserPlan;   // the actual plan tier
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,22 +20,31 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   signOut: async () => {},
   isPro: false,
+  userPlan: 'free',
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPro, setIsPro] = useState(false);
+  const [userPlan, setUserPlan] = useState<UserPlan>('free');
   const supabase = createClient();
 
-  // Fetch the profile to get real isPro status
+  // Derive isPro from userPlan (any active paid plan counts)
+  const isPro = userPlan !== 'free';
+
+  // Fetch the profile to get real plan status
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
       .select('plan, subscription_status')
       .eq('id', userId)
       .single();
-    setIsPro(data?.plan === 'pro' && data?.subscription_status === 'active');
+
+    if (data?.subscription_status === 'active' && ['standard', 'pro', 'ultra'].includes(data?.plan)) {
+      setUserPlan(data.plan as UserPlan);
+    } else {
+      setUserPlan('free');
+    }
   };
 
   useEffect(() => {
@@ -45,7 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 2. Listen for auth changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      const previousUser = user;
       setUser(session?.user ?? null);
       
       if (session?.user) {
@@ -54,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           toast.success('Successfully signed in!');
         }
       } else {
-        setIsPro(false);
+        setUserPlan('free');
         if (event === 'SIGNED_OUT') {
           toast.success('Successfully signed out!');
         }
@@ -68,11 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setIsPro(false);
+    setUserPlan('free');
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, signOut, isPro }}>
+    <AuthContext.Provider value={{ user, isLoading, signOut, isPro, userPlan }}>
       {children}
     </AuthContext.Provider>
   );

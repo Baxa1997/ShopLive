@@ -104,7 +104,7 @@ export default function ShopifyImporterPage() {
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallGate, setPaywallGate] = useState<'signup' | 'payment'>('signup');
-  const [selectedPlan, setSelectedPlan] = useState<'pay-per-use' | 'monthly' | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'standard' | 'pro' | 'ultra' | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState<StripePlan | null>(null);
   const [checkoutError, setCheckoutError] = useState('');
@@ -968,11 +968,11 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
 
                 {/* Plans */}
                 <div className="p-6 space-y-3">
-                  {/* Pay-per-use */}
+                  {/* Standard */}
                   <button
-                    onClick={() => setSelectedPlan('pay-per-use')}
+                    onClick={() => setSelectedPlan('standard')}
                     className={`w-full p-4 rounded-2xl border-2 text-left transition-all group ${
-                      selectedPlan === 'pay-per-use'
+                      selectedPlan === 'standard'
                         ? 'border-emerald-500 bg-emerald-50'
                         : 'border-slate-200 hover:border-slate-300 bg-white'
                     }`}
@@ -980,43 +980,67 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
-                          selectedPlan === 'pay-per-use' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                          selectedPlan === 'standard' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
                         }`}>⚡</div>
-                        <span className="font-bold text-slate-900">Pay Per Generation</span>
+                        <span className="font-bold text-slate-900">Standard</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-2xl font-black text-slate-900">$1</span>
-                        <span className="text-xs text-slate-400 ml-1">/ run</span>
+                        <span className="text-2xl font-black text-slate-900">$1.25</span>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500 pl-10">One-time payment. Process any PDF once (no page limit), download immediately.</p>
+                    <p className="text-xs text-slate-500 pl-10">3 generations. Process PDFs, download CSVs instantly.</p>
                   </button>
 
-                  {/* Monthly */}
+                  {/* Pro */}
                   <button
-                    onClick={() => setSelectedPlan('monthly')}
+                    onClick={() => setSelectedPlan('pro')}
                     className={`w-full p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden ${
-                      selectedPlan === 'monthly'
+                      selectedPlan === 'pro'
                         ? 'border-emerald-500 bg-emerald-50'
                         : 'border-slate-200 hover:border-slate-300 bg-white'
                     }`}
                   >
                     <div className="absolute top-3 right-3">
-                      <span className="bg-emerald-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wide">Best Value</span>
+                      <span className="bg-emerald-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wide">Popular</span>
                     </div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
-                          selectedPlan === 'monthly' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
-                        }`}>👑</div>
-                        <span className="font-bold text-slate-900">Monthly Pro</span>
+                          selectedPlan === 'pro' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                        }`}>⭐</div>
+                        <span className="font-bold text-slate-900">Pro</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-2xl font-black text-slate-900">$9.99</span>
-                        <span className="text-xs text-slate-400 ml-1">/ month</span>
+                        <span className="text-2xl font-black text-slate-900">$5.25</span>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500 pl-10">Unlimited generations (no limit) · Priority AI · Full history · Bulk exports</p>
+                    <p className="text-xs text-slate-500 pl-10">15 generations · Priority AI · Full history</p>
+                  </button>
+
+                  {/* Ultra */}
+                  <button
+                    onClick={() => setSelectedPlan('ultra')}
+                    className={`w-full p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden ${
+                      selectedPlan === 'ultra'
+                        ? 'border-amber-500 bg-amber-50'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <div className="absolute top-3 right-3">
+                      <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wide">Best Value</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
+                          selectedPlan === 'ultra' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'
+                        }`}>👑</div>
+                        <span className="font-bold text-slate-900">Ultra</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-black text-slate-900">$14.25</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 pl-10">Unlimited generations · Unlimited PDF pages · Monthly subscription</p>
                   </button>
 
                   {/* Checkout error */}
@@ -1028,8 +1052,9 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                   <button
                     disabled={!selectedPlan || !!isCheckoutLoading}
                     onClick={() => {
-                      if (selectedPlan === 'pay-per-use') handlePaywallCheckout('pay_per_use');
-                      if (selectedPlan === 'monthly') handlePaywallCheckout('pro_monthly');
+                      if (selectedPlan === 'standard') handlePaywallCheckout('standard');
+                      if (selectedPlan === 'pro') handlePaywallCheckout('pro');
+                      if (selectedPlan === 'ultra') handlePaywallCheckout('ultra');
                     }}
                     className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black rounded-2xl transition-all shadow-lg shadow-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
@@ -1037,12 +1062,12 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
                       <><Loader2 className="w-4 h-4 animate-spin" /> Redirecting to Checkout...</>
                     ) : (
                       <><Zap className="w-4 h-4" />
-                      {selectedPlan === 'monthly' ? 'Subscribe for $9.99/mo' : selectedPlan === 'pay-per-use' ? 'Pay $1 & Continue' : 'Select a Plan'}
+                      {selectedPlan === 'ultra' ? 'Subscribe Ultra — $14.25/mo' : selectedPlan === 'pro' ? 'Get Pro — $5.25' : selectedPlan === 'standard' ? 'Get Standard — $1.25' : 'Select a Plan'}
                       </>
                     )}
                   </button>
 
-                  <p className="text-center text-xs text-slate-400">Secure checkout · Cancel anytime · Instant access</p>
+                  <p className="text-center text-xs text-slate-400">Secure checkout · Instant access · One-time payment</p>
                 </div>
               </>
             )}

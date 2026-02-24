@@ -1,27 +1,48 @@
 // lib/limits.ts
-// Supabase-backed generation limit tracker with three-tier system:
+// Supabase-backed generation limit tracker with tiered system:
 // 1. Anonymous users: 2 free generations (localStorage)
-// 2. Logged-in free users: 4 total generations (2 anonymous + 2 bonus after sign-up)
-// 3. Pro users: Unlimited generations
+// 2. Logged-in free users: 2 total generations
+// 3. Standard users: 3 generations
+// 4. Pro users: 15 generations
+// 5. Ultra users: Unlimited generations + unlimited PDF pages
 
 import { createClient } from '@/utils/supabase/client';
 
 /** Limit for anonymous (not logged-in) users */
 export const ANON_FREE_LIMIT = 2;
 
-/** Total limit for logged-in free users (they get 2 more on top of anonymous) */
+/** Total limit for logged-in free users */
 export const LOGGED_IN_FREE_LIMIT = 2;
+
+/** Limit for Standard plan users ($1.25) */
+export const STANDARD_LIMIT = 3;
+
+/** Limit for Pro plan users ($5.25) */
+export const PRO_LIMIT = 15;
 
 /** @deprecated — kept for backward compat; equals ANON_FREE_LIMIT */
 export const FREE_LIMIT = ANON_FREE_LIMIT;
 
+export type PlanTier = 'free' | 'standard' | 'pro' | 'ultra';
+
+/** Get the usage limit for a given plan tier */
+function getLimitForPlan(plan: PlanTier): number {
+  switch (plan) {
+    case 'ultra':    return Infinity;
+    case 'pro':      return PRO_LIMIT;
+    case 'standard': return STANDARD_LIMIT;
+    default:         return LOGGED_IN_FREE_LIMIT;
+  }
+}
+
 export interface UsageStatus {
   count: number;           // generations used today
   limit: number;           // total allowed for current tier
-  isPro: boolean;          // true if subscribed to pro plan
+  isPro: boolean;          // true if subscribed to any paid plan
   isLoggedIn: boolean;     // true if Supabase session exists
   remaining: number;       // how many are left
   canGenerate: boolean;    // false if limit hit
+  planTier: PlanTier;      // the actual plan tier
   /** Which gate should be shown when canGenerate is false */
   gate: 'none' | 'signup' | 'payment';
 }
@@ -51,6 +72,7 @@ export async function getUsageStatus(): Promise<UsageStatus> {
         isLoggedIn: false,
         remaining: ANON_FREE_LIMIT,
         canGenerate: true,
+        planTier: 'free',
         gate: 'none',
       };
     }
@@ -63,6 +85,7 @@ export async function getUsageStatus(): Promise<UsageStatus> {
       isLoggedIn: false,
       remaining: Math.max(0, ANON_FREE_LIMIT - count),
       canGenerate,
+      planTier: 'free',
       gate: canGenerate ? 'none' : 'signup',
     };
   }
@@ -83,11 +106,17 @@ export async function getUsageStatus(): Promise<UsageStatus> {
       isLoggedIn: true,
       remaining: LOGGED_IN_FREE_LIMIT,
       canGenerate: true,
+      planTier: 'free',
       gate: 'none',
     };
   }
 
-  const isPro = profile.plan === 'pro' && profile.subscription_status === 'active';
+  const isActive = profile.subscription_status === 'active';
+  const planTier: PlanTier = isActive && ['standard', 'pro', 'ultra'].includes(profile.plan)
+    ? (profile.plan as PlanTier)
+    : 'free';
+  const isPro = planTier !== 'free';
+  const limit = getLimitForPlan(planTier);
   const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
 
   // Auto-reset counter if it's a new calendar day
@@ -99,19 +128,19 @@ export async function getUsageStatus(): Promise<UsageStatus> {
 
     return {
       count: 0,
-      limit: isPro ? Infinity : LOGGED_IN_FREE_LIMIT,
+      limit,
       isPro,
       isLoggedIn: true,
-      remaining: isPro ? Infinity : LOGGED_IN_FREE_LIMIT,
+      remaining: limit,
       canGenerate: true,
+      planTier,
       gate: 'none',
     };
   }
 
   const count = profile.daily_generation_count ?? 0;
-  const limit = isPro ? Infinity : LOGGED_IN_FREE_LIMIT;
-  const remaining = isPro ? Infinity : Math.max(0, limit - count);
-  const canGenerate = isPro || count < LOGGED_IN_FREE_LIMIT;
+  const remaining = limit === Infinity ? Infinity : Math.max(0, limit - count);
+  const canGenerate = limit === Infinity || count < limit;
 
   return {
     count,
@@ -120,6 +149,7 @@ export async function getUsageStatus(): Promise<UsageStatus> {
     isLoggedIn: true,
     remaining,
     canGenerate,
+    planTier,
     gate: canGenerate ? 'none' : 'payment',
   };
 }
@@ -151,13 +181,19 @@ export async function incrementUsage(): Promise<boolean> {
 
   if (!profile) return false;
 
-  const isPro = profile.plan === 'pro' && profile.subscription_status === 'active';
-  if (isPro) return true; // Pro users have no limit
+  const isActive = profile.subscription_status === 'active';
+  const planTier: PlanTier = isActive && ['standard', 'pro', 'ultra'].includes(profile.plan)
+    ? (profile.plan as PlanTier)
+    : 'free';
+  const limit = getLimitForPlan(planTier);
+
+  // Ultra users have no limit
+  if (limit === Infinity) return true;
 
   const today = new Date().toISOString().split('T')[0];
   const currentCount = profile.daily_reset_date !== today ? 0 : (profile.daily_generation_count ?? 0);
 
-  if (currentCount >= LOGGED_IN_FREE_LIMIT) return false;
+  if (currentCount >= limit) return false;
 
   await supabase
     .from('profiles')
