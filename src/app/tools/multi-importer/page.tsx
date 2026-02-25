@@ -1019,37 +1019,60 @@ Be precise and concise. This structure description will be used to parse extract
   };
 
   const generateCSV = () => {
+    // Official Shopify CSV headers
     const headers = [
-      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Product Category', 'Google Product Category', 'Tags', 'Published',
-      'Option1 Name', 'Option1 Value', 'Variant Price', 'Variant Grams', 
-      'Variant Inventory Tracker', 'Variant Inventory Qty', 'Variant SKU', 'SEO Title', 'SEO Description'
+      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Product Category', 'Type', 'Tags', 'Published',
+      'Option1 Name', 'Option1 Value', 'Option2 Name', 'Option2 Value', 'Option3 Name', 'Option3 Value',
+      'Variant SKU', 'Variant Grams', 'Variant Inventory Tracker', 'Variant Inventory Qty', 
+      'Variant Inventory Policy', 'Variant Fulfillment Service', 'Variant Price', 
+      'Variant Compare At Price', 'Variant Requires Shipping', 'Variant Taxable', 'Variant Barcode',
+      'Image Src', 'Image Position', 'Image Alt Text', 'Gift Card', 'SEO Title', 'SEO Description',
+      'Google Product Category', 'Variant Image', 'Variant Weight Unit', 'Variant Tax Code', 'Cost per item', 'Status'
     ];
     
     const rows: any[] = [];
     products.forEach(p => {
-
       const cleanGoogleCategory = p.shopify_service.google_product_category?.replace(/^gid:\/\/shopify\/TaxonomyCategory\//, '') || '';
       
-      p.shopify_service.variants.forEach(v => {
+      p.shopify_service.variants.forEach((v, vIdx) => {
         rows.push([
           p.shopify_service.handle,
-          p.shopify_service.title,
-          p.shopify_service.html_description,
+          vIdx === 0 ? p.shopify_service.title : '', // Title only on first row
+          vIdx === 0 ? p.shopify_service.html_description : '', // Body only on first row
           p.shopify_service.vendor,
-          p.shopify_service.product_type,
           p.shopify_service.category,
-          cleanGoogleCategory,
+          p.shopify_service.product_type,
           p.shopify_service.tags,
-          'TRUE', 
-          v.option1_name,
-          v.option1_value,
-          v.price,
-          v.grams,
-          'shopify',
-          v.inventory_qty,
+          'TRUE', // Published
+          v.option1_name || 'Title',
+          v.option1_value || 'Default Title',
+          '', // Option2 Name
+          '', // Option2 Value
+          '', // Option3 Name
+          '', // Option3 Value
           v.sku,
+          v.grams || 0,
+          'shopify', // Inventory Tracker
+          v.inventory_qty || 0,
+          'deny', // Inventory Policy
+          'manual', // Fulfillment Service
+          v.price,
+          '', // Compare At Price
+          'TRUE', // Requires Shipping
+          'TRUE', // Taxable
+          '', // Barcode
+          '', // Image Src (Placeholder)
+          '', // Image Position
+          '', // Image Alt Text
+          'FALSE', // Gift Card
           p.shopify_service.seo_title,
-          p.shopify_service.seo_description
+          p.shopify_service.seo_description,
+          cleanGoogleCategory,
+          '', // Variant Image
+          'g', // Weight Unit
+          '', // Tax Code
+          '', // Cost per item
+          'active' // Status
         ]);
       });
     });
