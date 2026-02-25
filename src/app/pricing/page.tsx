@@ -100,10 +100,8 @@ export default function PricingPage() {
   const handleSelectPlan = async (plan: StripePlan) => {
     setError('');
 
-    // If user is already on this plan, do nothing
     if (isCurrentPlan(plan)) return;
 
-    // If user is NOT logged in, show login modal and remember the plan
     if (!user) {
       setPendingPlan(plan);
       setShowLoginModal(true);
@@ -113,7 +111,6 @@ export default function PricingPage() {
     setLoadingPlan(plan);
     try {
       await redirectToCheckout(plan, user?.email ?? undefined);
-      // Page will redirect to Stripe — no need to reset state
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
       setLoadingPlan(null);
@@ -123,7 +120,6 @@ export default function PricingPage() {
   const handleGoogleLogin = async () => {
     setIsSigningIn(true);
 
-    // Store the pending plan so we can auto-checkout after redirect
     if (pendingPlan) {
       sessionStorage.setItem('pending_checkout_plan', pendingPlan);
     }
@@ -140,7 +136,6 @@ export default function PricingPage() {
       setIsSigningIn(false);
       sessionStorage.removeItem('pending_checkout_plan');
     }
-    // Page will redirect, so no need to reset isSigningIn on success
   };
 
   const getPlanLabel = (planId: StripePlan) => {
@@ -151,7 +146,6 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden font-sans selection:bg-emerald-500/30 pt-16">
 
-      {/* Background Ambience */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px]" />
@@ -169,7 +163,6 @@ export default function PricingPage() {
             Choose Your <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Perfect Plan</span>
           </h1>
 
-          {/* Already on a plan banner */}
           {isPro && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -181,7 +174,6 @@ export default function PricingPage() {
             </motion.div>
           )}
 
-          {/* Error */}
           {error && (
             <motion.p
               initial={{ opacity: 0 }}
@@ -207,7 +199,6 @@ export default function PricingPage() {
                 transition={{ delay: 0.1 + index * 0.1 }}
                 className={`relative flex flex-col ${plan.highlight ? 'md:-mt-4 md:mb-0' : ''}`}
               >
-                {/* Popular badge */}
                 {plan.highlight && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-emerald-900 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-xl z-20">
                     <Sparkles className="w-3 h-3 text-amber-400" /> Most Popular
@@ -273,7 +264,7 @@ export default function PricingPage() {
           })}
         </div>
 
-        {/* Comparison callout */}
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -304,7 +295,7 @@ export default function PricingPage() {
         </p>
       </div>
 
-      {/* ── LOGIN-FIRST MODAL ── */}
+
       <AnimatePresence>
         {showLoginModal && (
           <motion.div
@@ -320,7 +311,7 @@ export default function PricingPage() {
               exit={{ opacity: 0, scale: 0.95, y: 30 }}
               className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden"
             >
-              {/* Decorative Header */}
+
               <div className="h-32 bg-gradient-to-br from-slate-900 to-emerald-950 relative overflow-hidden flex items-center justify-center">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/20 to-transparent" />
                 <div className="absolute top-[-40%] left-[-10%] w-[180px] h-[180px] bg-emerald-500/10 rounded-full blur-[60px]" />

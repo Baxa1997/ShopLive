@@ -15,6 +15,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
 import { PDFDocument } from 'pdf-lib';
+import { extractTextFromPDF, groupPagesIntoTextChunks } from '@/lib/pdf-text-extractor';
 
 interface MasterArchitectVariant {
   sku: string;
@@ -119,6 +120,9 @@ export default function ShopifyImporterPage() {
   });
   const [isConfigConfirmed, setIsConfigConfirmed] = useState(false);
   const [activeMarketplace, setActiveMarketplace] = useState<'shopify' | 'amazon' | null>(null);
+  const [showEnrichmentModal, setShowEnrichmentModal] = useState(false);
+  const [pendingCoreProducts, setPendingCoreProducts] = useState<any[]>([]);
+  const [isEnriching, setIsEnriching] = useState(false);
 
   useEffect(() => {
     const savedMarketplace = sessionStorage.getItem('target_system');
@@ -198,10 +202,229 @@ export default function ShopifyImporterPage() {
     }
   };
 
-  // Sends one PDF chunk to Gemini and returns the parsed products.
-  // expectedCount is an estimate used to tell the model how many products to find.
-  const extractData = async (
+  // ═══════════════════════════════════════════════════════════
+  // PASS 1: Lightweight extraction — binary PDF, small output
+  // Only extracts: product name, SKU, vendor, variants, category, price
+  // ~150 chars per product (vs ~800 before) → 3x more products per call
+  // ═══════════════════════════════════════════════════════════
+  interface CoreProduct {
+    title: string;
+    vendor: string;
+    product_type: string;
+    google_product_category: string;
+    variants: { sku: string; size: string; price: string; }[];
+  }
+
+  const extractCoreData = async (
     file: File | Blob,
+    apiKey: string,
+    config: typeof userConfig,
+    isConfigConfirmed: boolean,
+    expectedCount?: number,
+    structureContext?: string
+  ): Promise<CoreProduct[]> => {
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    const schema = {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          title: { type: SchemaType.STRING },
+          vendor: { type: SchemaType.STRING },
+          product_type: { type: SchemaType.STRING },
+          google_product_category: { type: SchemaType.STRING },
+          variants: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                sku: { type: SchemaType.STRING },
+                size: { type: SchemaType.STRING },
+                price: { type: SchemaType.STRING },
+              }
+            }
+          }
+        },
+        required: ["title", "vendor", "product_type", "google_product_category", "variants"]
+      }
+    };
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3-flash-preview",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: schema as any,
+      },
+    });
+
+    const imagePart = await fileToGenerativePart(file as File);
+    const countHint = expectedCount ? `\nThis chunk has approximately ${expectedCount} products. Extract ALL of them.` : '';
+    const structureHint = structureContext ? `\n\nDOCUMENT STRUCTURE:\n${structureContext}\n` : '';
+
+    const prompt = `Extract ALL products from these PDF pages.${countHint}${structureHint}
+
+RULES:
+- Use EXACT product names from the PDF. NEVER invent or rephrase names.
+- Use EXACT Item#/SKU from the PDF tables. NEVER generate fake codes.
+- Each size/color row is a VARIANT under one product. Use Item# as sku, Size as size.
+- vendor: Extract from PDF header/logo. NEVER use "ShopsReady".
+- product_type: Best category for the product (e.g., "Terracotta Pots", "Planters").
+- google_product_category: Most specific Google Product Category breadcrumb (e.g., "Home & Garden > Lawn & Garden > Gardening > Pots & Planters").
+- price: Use exact price from PDF. If missing, use "".
+- Include EVERY product. Missing a product is not acceptable.`;
+
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    const text = response.text();
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) throw new Error("Invalid response format");
+    return parsed;
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // PASS 2: Enrichment — text-only, generates marketplace fields
+  // Takes extracted core data → produces full UnifiedProduct[]
+  // No PDF needed, just product names and categories
+  // ═══════════════════════════════════════════════════════════
+  const enrichProducts = async (
+    coreProducts: CoreProduct[],
+    apiKey: string,
+    config: typeof userConfig,
+    isConfigConfirmed: boolean
+  ): Promise<UnifiedProduct[]> => {
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    const needsShopify = config.targetChannels === 'Shopify' || config.targetChannels === 'Both';
+    const needsAmazon = config.targetChannels === 'Amazon' || config.targetChannels === 'Both';
+
+    // Build schema dynamically based on selected channels
+    const schemaProps: any = {
+      index: { type: SchemaType.NUMBER },
+      google_product_category: { type: SchemaType.STRING },
+    };
+    const requiredFields = ["index", "google_product_category"];
+
+    if (needsShopify) {
+      schemaProps.html_description = { type: SchemaType.STRING };
+      schemaProps.tags = { type: SchemaType.STRING };
+      schemaProps.seo_title = { type: SchemaType.STRING };
+      schemaProps.seo_description = { type: SchemaType.STRING };
+      requiredFields.push("html_description", "tags", "seo_title", "seo_description");
+    }
+    if (needsAmazon) {
+      schemaProps.amazon_bullets = { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } };
+      schemaProps.search_terms = { type: SchemaType.STRING };
+      requiredFields.push("amazon_bullets", "search_terms");
+    }
+
+    const schema = {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: schemaProps,
+        required: requiredFields
+      }
+    };
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3-flash-preview",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: schema as any,
+      },
+    });
+
+    const productList = coreProducts.map((p, i) =>
+      `[${i}] "${p.title}" by ${p.vendor} | Type: ${p.product_type} | Variants: ${p.variants.map(v => `${v.sku} (${v.size})`).join(', ')}`
+    ).join('\n');
+
+    // Build prompt only for selected channels
+    let fieldInstructions = '- index: the product index number [0], [1], etc.\n- google_product_category: Most specific Google Product Category breadcrumb\n';
+    if (needsShopify) {
+      fieldInstructions += `- html_description: Professional HTML description (<strong>, <li> tags). Keep concise.
+- tags: Comma-separated SEO tags
+- seo_title: SEO title (max 60 chars)
+- seo_description: SEO meta description (max 155 chars)\n`;
+    }
+    if (needsAmazon) {
+      fieldInstructions += `- amazon_bullets: 5 BOLD CAPS bullet points for Amazon
+- search_terms: 250 chars of Amazon search terms\n`;
+    }
+
+    const prompt = `Generate ${needsShopify && needsAmazon ? 'marketplace' : needsShopify ? 'Shopify' : 'Amazon'} content for these products.
+
+Products:
+${productList}
+
+For EACH product, generate:
+${fieldInstructions}
+Return a JSON array with one object per product, in the same order.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    const enrichments = JSON.parse(text);
+
+    // Merge core data + enrichment
+    return coreProducts.map((core, i) => {
+      const enrichment = Array.isArray(enrichments) ? enrichments.find((e: any) => e.index === i) || enrichments[i] : null;
+      const handle = core.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+      return {
+        sync_id: core.variants[0]?.sku || `PROD-${i + 1}`,
+        success_feedback: {
+          total_variants: core.variants.length,
+          channels_ready: config.targetChannels === 'Both' ? ['Shopify', 'Amazon FBA'] : [config.targetChannels],
+          summary_message: `${core.title} with ${core.variants.length} variant(s) ready for export.`
+        },
+        shopify_service: {
+          handle,
+          title: core.title,
+          html_description: needsShopify ? (enrichment?.html_description || '') : '',
+          tags: needsShopify ? (enrichment?.tags || core.product_type) : core.product_type,
+          vendor: core.vendor,
+          product_type: core.product_type,
+          category: core.google_product_category || enrichment?.google_product_category || core.product_type,
+          google_product_category: core.google_product_category || enrichment?.google_product_category || '',
+          seo_title: needsShopify ? (enrichment?.seo_title || core.title) : core.title,
+          seo_description: needsShopify ? (enrichment?.seo_description || '') : '',
+          variants: core.variants.map(v => ({
+            sku: v.sku,
+            price: v.price || (isConfigConfirmed ? '' : '0'),
+            option1_name: 'Size',
+            option1_value: v.size,
+            grams: 0,
+            inventory_qty: isConfigConfirmed ? (config.defaultQty || 0) : 0,
+          }))
+        },
+        amazon_fba_service: {
+          flat_file_data: {
+            item_name: core.title,
+            item_type_keyword: core.product_type,
+            feed_product_type: core.product_type,
+            brand_name: core.vendor,
+            standard_price: core.variants[0]?.price || '',
+            bullets: needsAmazon ? (enrichment?.amazon_bullets || []) : []
+          },
+          search_terms: needsAmazon ? (enrichment?.search_terms || '') : '',
+          rufus_summary: needsAmazon ? `${core.title} by ${core.vendor}. Available in ${core.variants.length} size(s).` : ''
+        },
+        aplus_content_service: {
+          modules: needsShopify ? [{ header: core.title, body: enrichment?.html_description || '' }] : [],
+          image_alt_text: core.title
+        },
+        readiness_report: {
+          status: 'High',
+          missing_fields: []
+        }
+      } as UnifiedProduct;
+    });
+  };
+
+  // ── Text-mode extraction (sends pre-extracted text, much faster) ──
+  const extractDataFromText = async (
+    textContent: string,
     apiKey: string,
     config: typeof userConfig,
     isConfigConfirmed: boolean,
@@ -219,10 +442,7 @@ export default function ShopifyImporterPage() {
             type: SchemaType.OBJECT,
             properties: {
               total_variants: { type: SchemaType.NUMBER },
-              channels_ready: {
-                type: SchemaType.ARRAY,
-                items: { type: SchemaType.STRING }
-              },
+              channels_ready: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
               summary_message: { type: SchemaType.STRING }
             },
             required: ["total_variants", "channels_ready", "summary_message"]
@@ -267,10 +487,7 @@ export default function ShopifyImporterPage() {
                   feed_product_type: { type: SchemaType.STRING },
                   brand_name: { type: SchemaType.STRING },
                   standard_price: { type: SchemaType.STRING },
-                  bullets: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING }
-                  }
+                  bullets: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
                 }
               },
               search_terms: { type: SchemaType.STRING },
@@ -285,10 +502,7 @@ export default function ShopifyImporterPage() {
                 type: SchemaType.ARRAY,
                 items: {
                   type: SchemaType.OBJECT,
-                  properties: {
-                    header: { type: SchemaType.STRING },
-                    body: { type: SchemaType.STRING }
-                  }
+                  properties: { header: { type: SchemaType.STRING }, body: { type: SchemaType.STRING } }
                 }
               },
               image_alt_text: { type: SchemaType.STRING }
@@ -298,10 +512,7 @@ export default function ShopifyImporterPage() {
             type: SchemaType.OBJECT,
             properties: {
               status: { type: SchemaType.STRING },
-              missing_fields: {
-                type: SchemaType.ARRAY,
-                items: { type: SchemaType.STRING }
-              }
+              missing_fields: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
             }
           }
         },
@@ -310,72 +521,178 @@ export default function ShopifyImporterPage() {
     };
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: schema as any,
       },
     });
 
-    const imagePart = await fileToGenerativePart(file as File);
-
     const target_system = config.targetChannels === 'Both' ? ['shopify', 'amazon'] : config.targetChannels.toLowerCase();
-    const countHint = expectedCount ? `\n\nCRITICAL: This chunk is expected to contain approximately ${expectedCount} distinct product(s). You MUST extract ALL of them — do not skip any product, even if the data is sparse. Every unique product name/SKU row in the PDF is a separate product entry.` : '';
+    const countHint = expectedCount ? `\n\nCRITICAL: This data contains approximately ${expectedCount} distinct product(s). You MUST extract ALL of them.` : '';
 
-    const prompt = `Act as a Senior Marketplace Architect. 
+    const prompt = `Act as a Senior Marketplace Architect.
 
-Goal: Process product data from PDF for high-integrity export.
+Goal: Process product data for high-integrity export.
 Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(target_system)}).${countHint}
 
-1. Dynamic Identity & Vendor Detection:
-- **Source:** Extract brand/manufacturer from PDF logos, headers, or "Brand" fields.
-- **Strict Rule:** NEVER use 'ShopsReady'. 
-- **Vendor Logic:** If brand is missing, use the **Supplier/Company name** from the header. Leave blank if no supplier info exists.
+Rules:
+1. Extract brand/manufacturer from data. NEVER use 'ShopsReady'.
+2. COMPLETENESS: Output one JSON object for EVERY distinct product. Missing a product is not acceptable.
+3. Use EXACT product titles. Group variants (sizes/colors) into ONE product with a 'variants' array.
+4. Descriptions: HTML for Shopify, Raw Text for Amazon. Use ONLY data from the source.
+5. Map to the most specific Shopify Category or Amazon Browse Node.
+6. Amazon: 5 BOLD CAPS bullet points + 250-char search terms.
+7. Stock: Use exact values if found. If missing: use ${config.defaultQty} if Config confirmed, else '0'.
+8. Pricing: Extract wholesale price. Multiply by ${config.priceMarkup} if Config confirmed.
+9. Return ONLY a valid JSON array. No filler data.
 
-2. Product Titles & Metadata (1:1 Extraction):
-- **COMPLETENESS RULE:** You MUST output one JSON object for EVERY distinct product found in the PDF pages. Missing a product is not acceptable.
-- **Titles:** Use the EXACT product titles found in the PDF. No optimization or rewriting. 
-- **B2B Variant Grouping:** If the PDF lists multiple rows for the same product (e.g., different sizes/colors), group them into ONE master product object with a 'variants' array.
+--- PRODUCT DATA (extracted from PDF pages) ---
 
-3. Description Logic:
-- **Rule:** Use ONLY technical descriptions provided in the PDF.
-- **Formatting:** HTML (<strong>, <li>) for Shopify; Raw Text (no HTML) for Amazon.
+${textContent}`;
 
-4. Smart Marketplace Category:
-- **Task:** Automatically detect and map the product to the most specific **Shopify Category (2026)** or **Amazon Browse Node**.
-- **Visual Breadcrumb:** Provide the deepest possible breadcrumb (e.g., 'Home & Garden > Kitchen > Tools').
-
-5. Technical Sync:
-- **Match Score:** Assign a confidence score: 'High' (Exact Match) or 'Medium' (Review Needed).
-
-6. Amazon-Specific Extraction:
-- **Bullet Points (Bold Caps):** Extract 5 key features from the PDF and format as BOLD CAPS bullets (e.g., 'DURABLE BUILD: ...'). Do not invent new features.
-- **Search Terms:** Extract 250 characters of keywords based strictly on PDF content.
-
-7. Inventory & Pricing (Scan-First Logic):
-- **Stock:** 1. Use exact 'Quantity' or 'Stock' values from PDF if found.
-    2. IF MISSING: Use ${config.defaultQty} ONLY IF 'Config Status' is true. 
-    3. Otherwise, output '0'. NEVER use placeholder numbers like '100'.
-- **Cost/Markup:** Extract 'Wholesale' price. Multiply by ${config.priceMarkup} ONLY IF 'Config Status' is true.
-
-8. Technical Synchronization:
-- **Category Sync:** Apply the detected breadcrumb to the 'Standard Product Type' (Shopify) and 'Category/Browse Node' (Amazon) fields.
-- **Handle Logic:** Ensure variants share a single 'Handle' for correct grouping.
-
-9. Output Formatting:
-- Map to ${config.targetChannels} headers. Return ONLY a valid JSON array. No filler data. Include every product.`;
-
-    const result = await model.generateContent([prompt, imagePart]);
+    const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) throw new Error("Invalid response format from AI");
+    return parsed;
+  };
 
-    const parsedProducts = JSON.parse(text);
+  // Helper: convert CoreProduct[] to basic UnifiedProduct[] (no enrichment)
+  const coreToBasicProducts = (coreProducts: CoreProduct[]): UnifiedProduct[] => {
+    return coreProducts.map((core, i) => {
+      const handle = core.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      return {
+        sync_id: core.variants[0]?.sku || `PROD-${i + 1}`,
+        success_feedback: {
+          total_variants: core.variants.length,
+          channels_ready: userConfig.targetChannels === 'Both' ? ['Shopify', 'Amazon FBA'] : [userConfig.targetChannels],
+          summary_message: `${core.title} with ${core.variants.length} variant(s) ready for export.`
+        },
+        shopify_service: {
+          handle,
+          title: core.title,
+          html_description: '',
+          tags: core.product_type,
+          vendor: core.vendor,
+          product_type: core.product_type,
+          category: core.google_product_category || core.product_type,
+          google_product_category: core.google_product_category || '',
+          seo_title: core.title,
+          seo_description: '',
+          variants: core.variants.map(v => ({
+            sku: v.sku,
+            price: v.price || '0',
+            option1_name: 'Size',
+            option1_value: v.size,
+            grams: 0,
+            inventory_qty: isConfigConfirmed ? (userConfig.defaultQty || 0) : 0,
+          }))
+        },
+        amazon_fba_service: {
+          flat_file_data: {
+            item_name: core.title,
+            item_type_keyword: core.product_type,
+            feed_product_type: core.product_type,
+            brand_name: core.vendor,
+            standard_price: core.variants[0]?.price || '',
+            bullets: []
+          },
+          search_terms: '',
+          rufus_summary: `${core.title} by ${core.vendor}. Available in ${core.variants.length} size(s).`
+        },
+        aplus_content_service: { modules: [], image_alt_text: core.title },
+        readiness_report: { status: 'High', missing_fields: [] }
+      } as UnifiedProduct;
+    });
+  };
 
-    if (!Array.isArray(parsedProducts)) {
-        throw new Error("Invalid response format from AI");
+  // Finalize: categorize, save, and show review page
+  const finalizeProcessing = async (productsToFinalize: UnifiedProduct[]) => {
+    try {
+      setIsLoading(true);
+      setLoadingStatus(`Categorizing ${productsToFinalize.length} products with AI…`);
+      setLoadingProgress(85);
+
+      // Increment usage counter
+      await incrementUsage();
+      setUsageCount(prev => prev + 1);
+
+      // Run smart categorization
+      const categorizedProducts = await handleSmartCategorization(productsToFinalize);
+
+      // Save to Supabase (async — don't block UI)
+      setLoadingProgress(95);
+      saveProject({
+        fileName: fileName || 'Manual Entry',
+        marketplace: (activeMarketplace as any) || 'shopify',
+        productCount: categorizedProducts.length,
+        products: categorizedProducts,
+      }).catch(err => console.warn('saveProject failed:', err));
+
+      setProducts(categorizedProducts);
+      setCurrentStep(3);
+      setLoadingProgress(100);
+      setLoadingStatus('');
+      setIsLoading(false);
+    } catch (err: any) {
+      console.error('Finalization error:', err);
+      setError(err.message || 'Failed to categorize products.');
+      setIsLoading(false);
+    }
+  };
+
+  // Skip enrichment — go straight to categorization
+  const handleSkipEnrichment = async () => {
+    setShowEnrichmentModal(false);
+    setPendingCoreProducts([]);
+    await finalizeProcessing(products);
+  };
+
+  // Enrichment handler (called from modal)
+  const handleEnrichment = async () => {
+    if (pendingCoreProducts.length === 0) return;
+    setIsEnriching(true);
+    setShowEnrichmentModal(false);
+    setLoadingStatus(`Enriching ${pendingCoreProducts.length} products with descriptions, SEO & Amazon data…`);
+    setIsLoading(true);
+    setLoadingProgress(70);
+
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    const ENRICH_BATCH = 30;
+    const enrichBatches = Math.ceil(pendingCoreProducts.length / ENRICH_BATCH);
+    let enrichedProducts: UnifiedProduct[] = [];
+
+    for (let i = 0; i < pendingCoreProducts.length; i += ENRICH_BATCH) {
+      const batch = pendingCoreProducts.slice(i, i + ENRICH_BATCH);
+      const batchNum = Math.floor(i / ENRICH_BATCH) + 1;
+      setLoadingStatus(`Enriching batch ${batchNum}/${enrichBatches} (${batch.length} products)…`);
+
+      try {
+        const enriched = await enrichProducts(
+          batch,
+          process.env.NEXT_PUBLIC_GOOGLE_API_KEY!,
+          userConfig,
+          isConfigConfirmed
+        );
+        enrichedProducts = [...enrichedProducts, ...enriched];
+        setProducts([...enrichedProducts]);
+      } catch (err) {
+        console.warn(`Enrichment batch ${batchNum} failed:`, err);
+        const basic = coreToBasicProducts(batch);
+        enrichedProducts = [...enrichedProducts, ...basic];
+        setProducts([...enrichedProducts]);
+      }
+
+      setLoadingProgress(70 + Math.round(((i + batch.length) / pendingCoreProducts.length) * 28));
     }
 
-    return parsedProducts;
+    setPendingCoreProducts([]);
+    setIsEnriching(false);
+
+    // Now finalize: categorize and show review page
+    await finalizeProcessing(enrichedProducts);
   };
 
   const handleAnalyze = async () => {
@@ -402,48 +719,80 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
     // Helper: sleep between API calls to avoid rate limits
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-    // Helper: extract with up to maxRetries attempts on failure
-    const extractWithRetry = async (
-      fileChunk: File,
-      apiKey: string,
-      config: typeof userConfig,
-      isConfigConfirmed: boolean,
-      expectedCount: number,
-      chunkLabel: string,
-      maxRetries = 2
-    ): Promise<UnifiedProduct[]> => {
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          const result = await extractData(fileChunk, apiKey, config, isConfigConfirmed, expectedCount);
-          return result;
-        } catch (err) {
-          console.warn(`Chunk ${chunkLabel} attempt ${attempt} failed:`, err);
-          if (attempt < maxRetries) {
-            await sleep(2000 * attempt); // back-off: 2s, 4s
-          }
-        }
-      }
-      console.error(`Chunk ${chunkLabel} failed after ${maxRetries} attempts. Skipping.`);
-      return [];
-    };
+
 
     try {
       if (!process.env.NEXT_PUBLIC_GOOGLE_API_KEY) {
         throw new Error('API key not configured.');
       }
-
       if (uploadedFile && uploadedFile.type === 'application/pdf') {
+        // ═══════════════════════════════════════════════════
+        // SMART ENGINE: Two-phase PDF processing
+        // Phase 1: Learn structure from first few pages (binary, 1 call)
+        // Phase 2: Bulk-process extracted text with learned structure
+        // ═══════════════════════════════════════════════════
+        const CONCURRENCY = 5; // 5 parallel API calls
+        let hasProcessedAtLeastOne = false;
+        const seenTitles = new Set<string>();
+
         const arrayBuffer = await uploadedFile.arrayBuffer();
         const pdfDoc = await PDFDocument.load(arrayBuffer);
         const totalPages = pdfDoc.getPageCount();
 
-        // Use a smaller batch size (5 pages) so the model stays well within
-        // its structured-output token budget and returns ALL products.
-        const batchSize = 5;
+        // ── PHASE 1: Structure Learning (~10s, 1 API call) ──
+        setLoadingStatus(`Phase 1: Learning document structure from first pages…`);
+        setLoadingProgress(5);
+
+        let learnedStructure = '';
+        try {
+          // Send first 3 pages as binary so Gemini can SEE the layout
+          const samplePages = Math.min(3, totalPages);
+          const sampleDoc = await PDFDocument.create();
+          const sampleIndices = Array.from({ length: samplePages }, (_, i) => i);
+          const copiedSample = await sampleDoc.copyPages(pdfDoc, sampleIndices);
+          copiedSample.forEach((page: any) => sampleDoc.addPage(page));
+          const sampleBytes = await sampleDoc.save();
+          const sampleBlob = new Blob([sampleBytes as any], { type: 'application/pdf' });
+          const sampleFile = new File([sampleBlob], 'sample.pdf', { type: 'application/pdf' });
+          const samplePart = await fileToGenerativePart(sampleFile);
+
+          const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GOOGLE_API_KEY!);
+          const structureModel = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+          const structureResult = await structureModel.generateContent([
+            `Analyze this product catalog PDF and describe EXACTLY the column structure and data layout.
+
+Your response must include:
+1. COLUMNS: List every column header you see (e.g., "Product Name", "SKU", "Size", "Color", "Price", "Qty", "UPC", etc.)
+2. DATA FORMAT: How is each field formatted? (e.g., "Price is in USD with dollar sign", "SKU format: ABC-123")
+3. VARIANT PATTERN: How are product variants shown? (e.g., "Same product in multiple rows with different sizes", "Sizes listed as comma-separated in one cell")
+4. BRAND/VENDOR: Where is the brand or vendor name shown? (header, per-row, etc.)
+5. GROUPING: Are products grouped by category, or is it a flat list?
+
+Be precise and concise. This structure description will be used to parse extracted text from ALL pages.`,
+            samplePart
+          ]);
+
+          learnedStructure = structureResult.response.text();
+          console.log('Learned PDF structure:', learnedStructure.substring(0, 200));
+        } catch (err) {
+          console.warn('Structure learning failed, will use generic prompts:', err);
+        }
+
+        setLoadingProgress(15);
+
+        // ── PASS 1: Lightweight core extraction (binary PDF, small output) ──
+        setLoadingStatus(`Pass 1: Extracting products from ${totalPages} pages…`);
+        setLoadingProgress(20);
+
+        const batchSize = 10; // 10 pages per chunk (lightweight schema fits easily)
         const totalBatches = Math.ceil(totalPages / batchSize);
-        
-        let hasProcessedAtLeastOne = false;
-        const seenTitles = new Set<string>(); // deduplication guard
+        let completedBatches = 0;
+        let allCoreProducts: CoreProduct[] = [];
+        const seenCoreTitles = new Set<string>();
+
+        interface ChunkInfo { batchIdx: number; file: File; pageCount: number; label: string; }
+        const chunks: ChunkInfo[] = [];
 
         for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
           const startPage = batchIdx * batchSize;
@@ -451,59 +800,97 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
           for (let j = 0; j < batchSize && (startPage + j) < totalPages; j++) {
             pageIndices.push(startPage + j);
           }
-
-          setLoadingStatus(
-            `Scanning pages ${startPage + 1}–${Math.min(startPage + batchSize, totalPages)} of ${totalPages} (batch ${batchIdx + 1}/${totalBatches})…`
-          );
-          setLoadingProgress(Math.round(((batchIdx) / totalBatches) * 80));
-
           const subDoc = await PDFDocument.create();
           const copiedPages = await subDoc.copyPages(pdfDoc, pageIndices);
           copiedPages.forEach((page: any) => subDoc.addPage(page));
           const pdfBytes = await subDoc.save();
           const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
           const fileChunk = new File([blob], `chunk_${startPage}.pdf`, { type: 'application/pdf' });
+          chunks.push({
+            batchIdx,
+            file: fileChunk,
+            pageCount: pageIndices.length,
+            label: `pages ${startPage + 1}–${Math.min(startPage + batchSize, totalPages)}`,
+          });
+        }
 
-          const chunkLabel = `pages ${startPage + 1}-${Math.min(startPage + batchSize, totalPages)}`;
-          const chunkProducts = await extractWithRetry(
-            fileChunk,
-            process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
-            userConfig,
-            isConfigConfirmed,
-            pageIndices.length * 3, // rough upper bound: ~3 products per page
-            chunkLabel
+        // Process chunks in parallel waves
+        for (let waveStart = 0; waveStart < chunks.length; waveStart += CONCURRENCY) {
+          const wave = chunks.slice(waveStart, waveStart + CONCURRENCY);
+          const waveNum = Math.floor(waveStart / CONCURRENCY) + 1;
+          const totalWaves = Math.ceil(chunks.length / CONCURRENCY);
+
+          setLoadingStatus(
+            `Pass 1 — wave ${waveNum}/${totalWaves}: ${wave.map(c => c.label).join(', ')}…`
           );
 
-          if (chunkProducts.length > 0) {
-            // Deduplicate by title to prevent duplicates across chunks
-            const uniqueChunk = chunkProducts.filter(p => {
-              const key = p.shopify_service?.title?.trim().toLowerCase();
-              if (!key || seenTitles.has(key)) return false;
-              seenTitles.add(key);
-              return true;
-            });
+          const waveResults = await Promise.allSettled(
+            wave.map(async chunk => {
+              for (let attempt = 1; attempt <= 2; attempt++) {
+                try {
+                  return await extractCoreData(
+                    chunk.file,
+                    process.env.NEXT_PUBLIC_GOOGLE_API_KEY!,
+                    userConfig,
+                    isConfigConfirmed,
+                    chunk.pageCount * 3,
+                    learnedStructure || undefined
+                  );
+                } catch (err) {
+                  console.warn(`Chunk ${chunk.label} attempt ${attempt} failed:`, err);
+                  if (attempt < 2) await sleep(2000);
+                }
+              }
+              return [] as CoreProduct[];
+            })
+          );
 
-            allProducts = [...allProducts, ...uniqueChunk];
-            // Update UI progressively so user sees results arriving
-            setProducts([...allProducts]);
-            hasProcessedAtLeastOne = true;
+          for (const result of waveResults) {
+            completedBatches++;
+            if (result.status === 'fulfilled' && result.value.length > 0) {
+              const uniqueChunk = result.value.filter(p => {
+                const key = p.title?.trim().toLowerCase();
+                if (!key || seenCoreTitles.has(key)) return false;
+                seenCoreTitles.add(key);
+                return true;
+              });
+              allCoreProducts = [...allCoreProducts, ...uniqueChunk];
+              hasProcessedAtLeastOne = true;
+            }
           }
 
-          // Respectful delay between batches to avoid rate-limiting
-          if (batchIdx < totalBatches - 1) {
-            await sleep(1500);
-          }
+          setLoadingProgress(20 + Math.round((completedBatches / totalBatches) * 40));
+          if (waveStart + CONCURRENCY < chunks.length) await sleep(500);
         }
+
+        if (!hasProcessedAtLeastOne || allCoreProducts.length === 0) {
+          throw new Error("Failed to extract any products from the PDF.");
+        }
+
+        // ── Convert to basic products & show immediately ──
+        allProducts = coreToBasicProducts(allCoreProducts);
+        setProducts([...allProducts]);
+        setLoadingProgress(90);
+
+        // Store core products for optional enrichment
+        setPendingCoreProducts(allCoreProducts);
         
-        if (!hasProcessedAtLeastOne) {
-          throw new Error("Failed to extract any products from the PDF. Please check that the file contains product data.");
-        }
+        // Show enrichment modal — user can choose to enrich or skip
+        setLoadingStatus(`✅ Extracted ${allCoreProducts.length} products! You can now enrich or proceed.`);
+        setLoadingProgress(100);
+        setIsLoading(false);
+        setCurrentStep(2);
+        setShowEnrichmentModal(true);
+        return; // Exit — enrichment handled by modal callback
 
       } else if (uploadedFile && uploadedFile.type.includes('image')) {
         setLoadingStatus('Analyzing image...');
-        const extracted = await extractData(uploadedFile, process.env.NEXT_PUBLIC_GOOGLE_API_KEY, userConfig, isConfigConfirmed);
-        allProducts = extracted;
-        setProducts(extracted);
+        const coreResult = await extractCoreData(uploadedFile, process.env.NEXT_PUBLIC_GOOGLE_API_KEY!, userConfig, isConfigConfirmed);
+        if (coreResult.length > 0) {
+          const enriched = await enrichProducts(coreResult, process.env.NEXT_PUBLIC_GOOGLE_API_KEY!, userConfig, isConfigConfirmed);
+          allProducts = enriched;
+          setProducts(enriched);
+        }
 
       } else {
         setLoadingStatus('Generating sample data...');
@@ -1081,6 +1468,67 @@ Selected Output Channels: ${config.targetChannels} (Target: ${JSON.stringify(tar
     <div className=" min-h-screen flex flex-col bg-slate-50 font-sans pt-24">
       {paywallJsx}
 
+      {/* Enrichment Modal */}
+      <AnimatePresence>
+        {showEnrichmentModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowEnrichmentModal(false); } }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.88, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.88, y: 24 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 280 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="text-center mb-4">
+                  <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                    <svg className="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    {pendingCoreProducts.length} Products Extracted!
+                  </h3>
+                  <p className="text-sm text-slate-500 mt-1">
+                    All product names, SKUs, variants, and categories are ready.
+                  </p>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
+                  <p className="text-sm font-semibold text-amber-800 mb-1">
+                    ✨ Optional: AI Enrichment
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    Add AI-generated descriptions, SEO titles, Amazon bullet points, and search terms. 
+                    This takes approximately <strong>5–10 extra minutes</strong>.
+                  </p>
+                </div>
+
+                <div className="space-y-2.5">
+                  <button
+                    onClick={handleEnrichment}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm hover:from-emerald-600 hover:to-teal-600 transition-all shadow-md"
+                  >
+                    ✨ Yes, Enrich Products
+                  </button>
+                  <button
+                    onClick={handleSkipEnrichment}
+                    className="w-full py-3 px-4 rounded-xl bg-slate-100 text-slate-700 font-semibold text-sm hover:bg-slate-200 transition-all"
+                  >
+                    Skip — Proceed to Export
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <header className="mb-2 text-center max-w-4xl mx-auto relative px-6 pt-2">
         <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter mb-0.5">
           <span className="text-emerald-600">PDF</span> to {
