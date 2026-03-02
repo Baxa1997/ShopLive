@@ -269,7 +269,6 @@ export default function Navbar() {
 
                 <div className="space-y-2.5 mb-7">
                   {[
-                    { icon: Sparkles, text: 'Unlimited Generation History', color: 'text-emerald-600', bg: 'bg-emerald-50' },
                     { icon: Zap, text: 'Instant Marketplace Sync', color: 'text-amber-600', bg: 'bg-amber-50' },
                     { icon: History, text: 'Full Technical AI Support', color: 'text-blue-600', bg: 'bg-blue-50' },
                   ].map((benefit, i) => (
