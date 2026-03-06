@@ -188,19 +188,6 @@ export default function LoginPage() {
 
       {/* Right Side - Login Form */}
       <div className="w-full md:w-1/2 flex flex-col relative">
-        {/* Mobile Header */}
-        <div className="md:hidden p-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-              <Layout className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-slate-900">ShopsReady</span>
-          </div>
-          <Link href="/" className="text-sm font-medium text-slate-500 flex items-center gap-1">
-            <ArrowLeft className="w-4 h-4" /> Back
-          </Link>
-        </div>
-
         <div className="flex-1 flex items-center justify-center p-6 md:p-12 lg:p-20">
           <div className="w-full max-w-md">
             <motion.div
