@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Header } from '@/components/Header';
+import { CallToAction } from '@/components/CallToAction';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -212,12 +214,10 @@ export default function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
             >
-              <div className="mb-10">
-                <p className="text-slate-500 dark:text-slate-400">Sign in to your account to continue</p>
-              </div>
+              <Header title="Welcome Back" description="Sign in to your account to continue your journey." />
 
               {!magicLinkSent ? (
-                <>
+                              <CallToAction>
                   <div className="space-y-4">
                     <button
                       onClick={handleGoogleLogin}
@@ -280,7 +280,7 @@ export default function LoginPage() {
                       )}
                     </button>
                   </form>
-                </>
+              </CallToAction>
               ) : (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
