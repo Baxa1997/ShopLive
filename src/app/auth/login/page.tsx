@@ -209,7 +209,6 @@ export default function LoginPage() {
               transition={{ duration: 0.5 }}
             >
               <div className="mb-10">
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Welcome back</h2>
                 <p className="text-slate-500">Sign in to your account to continue</p>
               </div>
 
