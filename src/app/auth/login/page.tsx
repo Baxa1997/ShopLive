@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Header } from '@/components/Header';
 import { CallToAction } from '@/components/CallToAction';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -214,7 +213,7 @@ export default function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
             >
-              <Header title="Welcome Back" description="Sign in to your account to continue your journey." />
+
 
               {!magicLinkSent ? (
                               <CallToAction>
