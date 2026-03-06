@@ -140,12 +140,7 @@ export default function LoginPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            <div className="flex items-center gap-3 mb-12">
-              <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <Layout className="w-7 h-7 text-white" />
-              </div>
-              <span className="text-2xl font-bold text-white tracking-tight">ShopsReady</span>
-            </div>
+
 
             <h1 className="text-4xl lg:text-5xl font-extrabold text-white leading-tight mb-6">
               Empower your commerce with <span className="text-emerald-400">AI intelligence.</span>
