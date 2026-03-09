@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, History, LogOut, ChevronDown, Crown, X, Zap } from 'lucide-react';
+import { Sparkles, History, LogOut, ChevronDown, Crown, X, Zap, BookOpen } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 
@@ -90,6 +90,7 @@ export default function Navbar() {
   const navLinks = [
     { href: '/tools/multi-importer', label: 'Generator', icon: Sparkles },
     { href: '/history', label: 'History', icon: History },
+    { href: '/blog', label: 'Blog', icon: BookOpen },
     { href: '/pricing', label: 'Pricing', icon: Crown },
   ];
 

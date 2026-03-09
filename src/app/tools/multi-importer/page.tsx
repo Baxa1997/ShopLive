@@ -1037,19 +1037,19 @@ Be precise and concise. This structure description will be used to parse extract
       p.shopify_service.variants.forEach((v, vIdx) => {
         rows.push([
           p.shopify_service.handle,
-          vIdx === 0 ? p.shopify_service.title : '', // Title only on first row
-          vIdx === 0 ? p.shopify_service.html_description : '', // Body only on first row
+          vIdx === 0 ? p.shopify_service.title : '',
+          vIdx === 0 ? p.shopify_service.html_description : '',
           p.shopify_service.vendor,
           p.shopify_service.category,
           p.shopify_service.product_type,
           p.shopify_service.tags,
-          'TRUE', // Published
+          'TRUE', 
           v.option1_name || 'Title',
           v.option1_value || 'Default Title',
-          '', // Option2 Name
-          '', // Option2 Value
-          '', // Option3 Name
-          '', // Option3 Value
+          '',
+          '', 
+          '',
+          '',
           v.sku,
           v.grams || 0,
           'shopify', // Inventory Tracker

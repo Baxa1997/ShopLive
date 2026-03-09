@@ -47,12 +47,6 @@ export default function RootLayout({
 
         <link rel="icon" href="/icon.png" />
         <link rel="apple-touch-icon" href="/icon.png" />
-
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9753691394615647"
-          crossOrigin="anonymous"
-        />
       </head>
       <body className={`${outfit.variable} ${inter.variable} font-sans antialiased`}>
         <Providers>

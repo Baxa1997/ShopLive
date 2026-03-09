@@ -33,6 +33,7 @@ export default function SiteFooter() {
             <ul className="space-y-2">
               <li><Link href="/" className="hover:text-emerald-400 transition-colors">Home</Link></li>
               <li><Link href="/about" className="hover:text-emerald-400 transition-colors">About</Link></li>
+              <li><Link href="/blog" className="hover:text-emerald-400 transition-colors">Blog</Link></li>
               <li><Link href="/docs" className="hover:text-emerald-400 transition-colors">Documentation</Link></li>
               <li><Link href="/policy" className="hover:text-emerald-400 transition-colors">Privacy & Terms</Link></li>
             </ul>

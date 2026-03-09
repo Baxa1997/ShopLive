@@ -7,6 +7,7 @@ import FeaturesSection from '@/components/FeaturesSection';
 import ExamplesSection from '@/components/ExamplesSection';
 import AmazonExampleSection from '@/components/AmazonExampleSection';
 import TestimonialsSection from '@/components/TestimonialsSection';
+import BlogPreviewSection from '@/components/BlogPreviewSection';
 import SiteFooter from '@/components/SiteFooter';
 import LiveBackground from '@/components/LiveBackground';
 
@@ -20,7 +21,9 @@ export default function Home() {
       <FeaturesSection />
       <ExamplesSection />
       <TestimonialsSection />
+      <BlogPreviewSection />
       <SiteFooter />
     </div>
   );
 }
+

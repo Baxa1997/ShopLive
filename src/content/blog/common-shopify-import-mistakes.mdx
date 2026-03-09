@@ -1,0 +1,132 @@
+---
+title: "10 Common Shopify Product Import Mistakes (and How to Fix Them)"
+excerpt: "Avoid the most frequent errors that merchants encounter when importing products to Shopify. From handle formatting to variant structure, we cover every pitfall and its solution."
+date: "2026-02-20"
+author: "ShopsReady Team"
+category: "E-commerce Guides"
+tags: ["shopify", "import-errors", "troubleshooting", "product-data", "best-practices"]
+coverImage: ""
+---
+
+## Why Imports Fail
+
+Product imports are one of the most frustrating experiences for Shopify merchants. A single formatting error in your CSV can cause the entire import to fail, or worse, silently corrupt your product data. After helping thousands of merchants with their product imports, we have identified the ten most common mistakes and their solutions.
+
+## Mistake 1: Wrong CSV Encoding
+
+The most fundamental error is saving your CSV with the wrong character encoding. This typically manifests as garbled characters in product names and descriptions, especially for products with non-English characters, accent marks, or special symbols.
+
+**The Problem:** Your spreadsheet application defaults to ANSI or Latin-1 encoding when saving CSV files.
+
+**The Fix:** Always save your CSV files with UTF-8 encoding. In Excel, use "Save As" and select "CSV UTF-8 (Comma delimited)" as the file type. In Google Sheets, the downloaded CSV is automatically UTF-8 encoded.
+
+**How to Detect:** Open your CSV in a text editor like VS Code or Notepad++ and check the encoding displayed in the status bar.
+
+## Mistake 2: Incorrect Handle Format
+
+Handles are the URL-friendly identifiers for your products. They must follow strict formatting rules, and violating these rules can cause import failures or create products with broken URLs.
+
+**The Problem:** Handles contain spaces, uppercase letters, special characters, or non-ASCII characters.
+
+**The Fix:** Handles should only contain lowercase letters, numbers, and hyphens. Convert product names to handles by lowercasing everything, replacing spaces with hyphens, and removing special characters.
+
+**Example:**
+- Wrong: `Women's Running Shoe (Size 8)`
+- Correct: `womens-running-shoe-size-8`
+
+## Mistake 3: Missing Variant Structure
+
+Multi-variant products are where most import headaches occur. The variant structure in Shopify's CSV is counterintuitive and requires careful attention.
+
+**The Problem:** All variant information is placed on a single row, or variant rows are missing the parent Handle.
+
+**The Fix:** Each variant must have its own row. The first row contains all product-level data plus the first variant's data. Subsequent rows only contain the Handle and variant-specific fields (Option values, SKU, price, inventory).
+
+Remember that Option1 Name and Option1 Value must be consistent across all variants. If the first variant says Option1 Name is "Size," every variant row for that product must use "Size" as the Option1 Name.
+
+## Mistake 4: Image URL Issues
+
+Product images are specified as URLs in the CSV, and there are several ways this can go wrong.
+
+**The Problem:** Image URLs are broken, require authentication, or point to locally hosted files.
+
+**The Fix:**
+- Ensure all image URLs are publicly accessible (test by pasting in an incognito browser window)
+- Use HTTPS URLs when possible
+- Avoid URL shorteners or redirect URLs
+- Do not use file paths (like `C:\images\product.jpg`); these must be web URLs
+- Verify that the image hosting service does not have hotlinking restrictions
+
+## Mistake 5: Price Formatting Errors
+
+Price fields need to be in a specific format that many international merchants get wrong.
+
+**The Problem:** Prices include currency symbols, use commas as decimal separators, or have thousand separators.
+
+**The Fix:**
+- Remove all currency symbols ($, €, £)
+- Use a period (dot) as the decimal separator
+- Do not use thousand separators
+- Wrong: `$1,299.99` or `1.299,99`
+- Correct: `1299.99`
+
+## Mistake 6: Overwriting Existing Products
+
+One of the most dangerous mistakes is accidentally overwriting existing products when you intended to create new ones.
+
+**The Problem:** Your CSV contains Handles that match existing products in your store. Shopify treats this as an update, not a new product creation.
+
+**The Fix:** Before importing, export your current product catalog and compare the Handles. Use a VLOOKUP or similar function to identify any conflicts. If you want to create new products, ensure all Handles in your import file are unique.
+
+**Pro Tip:** Add a prefix to new product handles during import to avoid conflicts, then remove it later if needed.
+
+## Mistake 7: Incorrect Tags Format
+
+Tags in Shopify's CSV have specific formatting requirements that are easy to violate.
+
+**The Problem:** Tags contain leading or trailing spaces, or use incorrect separators.
+
+**The Fix:** Tags should be comma-separated with no leading or trailing spaces. Each tag should be trimmed. Also note that Shopify tags are case-insensitive, so "Blue" and "blue" are treated as the same tag.
+
+- Wrong: ` blue , large , cotton `
+- Correct: `blue,large,cotton`
+
+## Mistake 8: Ignoring the Published Field
+
+The Published field controls whether a product is visible in your online store, and forgetting about it can have surprising consequences.
+
+**The Problem:** Products are imported but do not appear in the store, or draft products are accidentally published.
+
+**The Fix:** Explicitly set the Published field for every product. Use `TRUE` for products that should be visible and `FALSE` for draft products. Do not leave this field empty, as the default behavior may not be what you expect.
+
+## Mistake 9: SEO Fields Overlooked
+
+Many merchants skip the SEO-related fields during import, missing a valuable opportunity to optimize their product pages for search engines.
+
+**The Problem:** SEO Title and SEO Description fields are left empty, causing Shopify to auto-generate them from the product title and description.
+
+**The Fix:** Include meaningful SEO titles (under 70 characters) and descriptions (under 320 characters) for every product. These should include relevant keywords and be written for human readers, not just search engines.
+
+## Mistake 10: Not Testing First
+
+The biggest mistake of all is importing your entire catalog without testing first.
+
+**The Problem:** A formatting error in your CSV affects all products, and undoing a large import is tedious.
+
+**The Fix:** Always test with a small batch first. Create a CSV with 3-5 products that represent the variety in your full catalog (including multi-variant products) and import those first. Check that everything looks correct in your Shopify admin before proceeding with the full import.
+
+## Prevention Strategy
+
+The best way to avoid import mistakes is to establish a consistent workflow:
+
+1. Use a tested CSV template for every import
+2. Validate your data before importing (check encoding, handles, URLs, prices)
+3. Always test with a small batch first
+4. Keep a backup of your current product data before any import
+5. Document your field mappings for recurring imports
+
+For merchants who process imports regularly, consider using an automated tool like ShopsReady that enforces these rules automatically and eliminates the most common sources of error.
+
+## Conclusion
+
+Product import errors are almost always preventable. By understanding the common pitfalls and establishing a solid import workflow, you can save hours of troubleshooting and avoid the headaches that come with corrupted product data. The key is to be methodical, test thoroughly, and when possible, automate the parts of the process that are most prone to human error.
