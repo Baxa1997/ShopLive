@@ -1,4 +1,3 @@
-import Script from 'next/script';
 import type React from 'react';
 
 export const metadata = {
@@ -12,16 +11,5 @@ export default function BlogLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <>
-      {/* AdSense script — only loads on blog pages (content-rich pages) */}
-      <Script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9753691394615647"
-        crossOrigin="anonymous"
-        strategy="afterInteractive"
-      />
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }
