@@ -43,6 +43,9 @@ export default function Navbar() {
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
+  // Hide Navbar on Login page
+  if (pathname === '/login') return null;
+
   const isMainPage = pathname === '/';
 
   // Scroll listener — only triggers island on main page
