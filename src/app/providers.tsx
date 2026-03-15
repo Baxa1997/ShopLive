@@ -5,11 +5,18 @@
 
 import { AuthProvider } from '@/lib/auth-context';
 import Navbar from '@/components/Navbar';
+import { usePathname } from 'next/navigation';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  // Define routes where the Navbar should be hidden
+  const hideNavbarRoutes = ['/login'];
+  const shouldHideNavbar = hideNavbarRoutes.includes(pathname);
+
   return (
     <AuthProvider>
-      <Navbar />
+      {!shouldHideNavbar && <Navbar />}
       {children}
     </AuthProvider>
   );
