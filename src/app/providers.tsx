@@ -10,13 +10,16 @@ import { usePathname } from 'next/navigation';
 export default function Providers({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Robust check to hide Navbar on login page
-  // This covers '/login', '/login/', and any sub-paths
-  const shouldHideNavbar = pathname?.startsWith('/login');
+  // Define all routes that should not display the global navigation header
+  const authRoutes = ['/login', '/signup', '/forgot-password', '/reset-password', '/auth'];
+
+  // Check if current path matches any auth route
+  const isAuthPage = authRoutes.some(route => pathname?.startsWith(route));
 
   return (
     <AuthProvider>
-      {!shouldHideNavbar && <Navbar />}
+      {/* Only render Navbar if we are not on an auth-related page */}
+      {!isAuthPage && <Navbar />}
       {children}
     </AuthProvider>
   );

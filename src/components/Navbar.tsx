@@ -43,8 +43,11 @@ export default function Navbar() {
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
-  // Hide Navbar on Login page
-  if (pathname === '/login') return null;
+  // Define all routes that should hide the navbar
+  const authRoutes = ['/login', '/signup', '/forgot-password', '/reset-password', '/auth'];
+
+  // Hide Navbar on auth-related pages
+  if (authRoutes.some(route => pathname?.startsWith(route))) return null;
 
   const isMainPage = pathname === '/';
 
